@@ -99,6 +99,18 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     def dashboard():
         return render_template("dashboard.html")
 
+    @app.get("/documents")
+    def documents():
+        return render_template("documents.html")
+
+    @app.get("/sharing")
+    def sharing():
+        return render_template("sharing.html")
+
+    @app.get("/audit")
+    def audit():
+        return render_template("audit.html")
+
     @app.get("/health")
     def health():
         return {"status": "ok", "app": "secure-document-sharing-system"}
@@ -111,4 +123,3 @@ app = create_app()
 
 if __name__ == "__main__":
     app.run(host=app.config["APP_HOST"], port=app.config["APP_PORT"], debug=True)
-

@@ -3,24 +3,28 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<section class="hero">
-  <h1>Project Dashboard</h1>
+<section class="panel">
+  <h2>Dashboard</h2>
   <p class="muted" data-status>Loading starter status...</p>
+  <div class="button-row">
+    <a class="button-link" href="{{ url_for('documents') }}">Manage Documents</a>
+    <a class="button-link" href="{{ url_for('sharing') }}">Manage Sharing</a>
+    <a class="button-link" href="{{ url_for('audit') }}">View Audit Log</a>
+  </div>
 </section>
 
-<section class="card grid two">
+<section class="panel grid two">
   <article>
-    <h2>Document Workflow</h2>
-    <p class="muted">
-      Upload, encryption, versioning, access levels, and user-specific sharing will go here.
-    </p>
+    <h3>Account Summary</h3>
+    <p>Username: sample_user</p>
+    <p>System Role: user</p>
+    <p>Session Status: active</p>
   </article>
   <article>
-    <h2>Security Workflow</h2>
-    <p class="muted">
-      Logging, session handling, RBAC, validation, and audit trail features will be connected here.
-    </p>
+    <h3>Quick Summary</h3>
+    <p>Documents Owned: 0</p>
+    <p>Documents Shared With Me: 0</p>
+    <p>Recent Security Alerts: 0</p>
   </article>
 </section>
 {% endblock %}
-

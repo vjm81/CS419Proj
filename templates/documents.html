@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Documents{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Documents</h2>
+  <p class="muted">Basic document upload and listing page.</p>
+</section>
+
+<section class="panel grid two">
+  <article>
+    <h3>Upload Document</h3>
+    <form method="post" action="#" enctype="multipart/form-data">
+      <label for="document_name">Document Name</label>
+      <input id="document_name" name="document_name" type="text">
+
+      <label for="document_file">Choose File</label>
+      <input id="document_file" name="document_file" type="file">
+
+      <label for="document_notes">Notes</label>
+      <textarea id="document_notes" name="document_notes" rows="4"></textarea>
+
+      <button type="submit">Upload</button>
+    </form>
+  </article>
+
+  <article>
+    <h3>My Documents</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Version</th>
+          <th>Owner</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Example.pdf</td>
+          <td>1</td>
+          <td>sample_user</td>
+          <td><a href="#">Download</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </article>
+</section>
+{% endblock %}
+

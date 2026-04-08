@@ -8,9 +8,21 @@
 </head>
 <body>
   <main class="page-shell">
+    <header>
+      <h1>Secure Document Sharing System</h1>
+      <p class="muted">Basic frontend starter for the CS 419 project.</p>
+      <nav class="site-nav">
+        <a href="{{ url_for('index') }}">Home</a>
+        <a href="{{ url_for('register') }}">Register</a>
+        <a href="{{ url_for('login') }}">Login</a>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('documents') }}">Documents</a>
+        <a href="{{ url_for('sharing') }}">Sharing</a>
+        <a href="{{ url_for('audit') }}">Audit Log</a>
+      </nav>
+    </header>
     {% block content %}{% endblock %}
   </main>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
-

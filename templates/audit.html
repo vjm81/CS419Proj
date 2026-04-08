@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Log{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Audit Log</h2>
+  <p class="muted">Basic audit and version history page.</p>
+</section>
+
+<section class="panel">
+  <h3>Recent Events</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>User</th>
+        <th>Action</th>
+        <th>Document</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>2026-04-08 13:00</td>
+        <td>sample_user</td>
+        <td>Uploaded</td>
+        <td>Example.pdf</td>
+      </tr>
+      <tr>
+        <td>2026-04-08 13:15</td>
+        <td>sample_user</td>
+        <td>Shared with teammate1</td>
+        <td>Example.pdf</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

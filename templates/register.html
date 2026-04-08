@@ -3,9 +3,9 @@
 {% block title %}Register{% endblock %}
 
 {% block content %}
-<section class="card">
+<section class="panel">
   <h1>Register</h1>
-  <p class="muted">Starter form based on the assignment validation requirements.</p>
+  <p class="muted">Basic account creation form using the project password requirements.</p>
   <form method="post" action="#">
     <label for="username">Username</label>
     <input id="username" name="username" type="text" minlength="3" maxlength="20">
@@ -19,8 +19,7 @@
     <label for="confirm_password">Confirm Password</label>
     <input id="confirm_password" name="confirm_password" type="password" minlength="12" autocomplete="new-password">
 
-    <button class="button" type="submit">Create Account</button>
+    <button type="submit">Create Account</button>
   </form>
 </section>
 {% endblock %}
-

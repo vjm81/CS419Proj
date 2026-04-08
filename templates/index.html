@@ -3,35 +3,32 @@
 {% block title %}Home | Secure Document Sharing System{% endblock %}
 
 {% block content %}
-<section class="hero">
-  <p class="muted">CS 419 Course Project</p>
-  <h1>Secure Document Sharing System</h1>
+<section class="panel">
+  <h2>Welcome</h2>
   <p>
-    This starter app is structured for secure authentication, encrypted file handling,
-    document sharing, access control, audit logging, and later penetration testing.
+    This app will let users register, sign in, upload documents, share them with other users,
+    and view an audit trail.
   </p>
-  <div class="nav">
-    <a class="button" href="{{ url_for('register') }}">Create Account</a>
-    <a class="button secondary" href="{{ url_for('login') }}">Sign In</a>
-    <a class="button secondary" href="{{ url_for('dashboard') }}">Dashboard</a>
+  <div class="button-row">
+    <a class="button-link" href="{{ url_for('register') }}">Go to Register</a>
+    <a class="button-link" href="{{ url_for('login') }}">Go to Login</a>
+    <a class="button-link" href="{{ url_for('dashboard') }}">Go to Dashboard</a>
   </div>
 </section>
 
-<section class="card grid two">
+<section class="panel grid two">
   <article>
-    <h2>Included Now</h2>
-    <p class="muted">
-      Flask app entrypoint, secure config defaults, JSON storage folders, logging files,
-      starter templates, and a place for docs, tests, and slides.
-    </p>
+    <h2>Core Functions</h2>
+    <ul>
+      <li>User registration and login</li>
+      <li>Document upload and download</li>
+      <li>Document sharing permissions</li>
+      <li>Audit trail and version history</li>
+    </ul>
   </article>
   <article>
-    <h2>Next Build Steps</h2>
-    <p class="muted">
-      Registration, bcrypt password hashing, rate limiting, session management,
-      encrypted uploads, sharing rules, and audit trails.
-    </p>
+    <h2>Current State</h2>
+    <p class="muted">These pages are plain placeholders so we can connect backend logic next.</p>
   </article>
 </section>
 {% endblock %}
-
