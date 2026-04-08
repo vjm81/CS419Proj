@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Home | Secure Document Sharing System{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <p class="muted">CS 419 Course Project</p>
+  <h1>Secure Document Sharing System</h1>
+  <p>
+    This starter app is structured for secure authentication, encrypted file handling,
+    document sharing, access control, audit logging, and later penetration testing.
+  </p>
+  <div class="nav">
+    <a class="button" href="{{ url_for('register') }}">Create Account</a>
+    <a class="button secondary" href="{{ url_for('login') }}">Sign In</a>
+    <a class="button secondary" href="{{ url_for('dashboard') }}">Dashboard</a>
+  </div>
+</section>
+
+<section class="card grid two">
+  <article>
+    <h2>Included Now</h2>
+    <p class="muted">
+      Flask app entrypoint, secure config defaults, JSON storage folders, logging files,
+      starter templates, and a place for docs, tests, and slides.
+    </p>
+  </article>
+  <article>
+    <h2>Next Build Steps</h2>
+    <p class="muted">
+      Registration, bcrypt password hashing, rate limiting, session management,
+      encrypted uploads, sharing rules, and audit trails.
+    </p>
+  </article>
+</section>
+{% endblock %}
+

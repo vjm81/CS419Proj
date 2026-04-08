@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+instance/
+secret.key
+*.pem
+*.log
+docs/*.pdf
+presentation/*.pdf
+presentation/*.pptx
+

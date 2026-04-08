@@ -1,0 +1,108 @@
+:root {
+  --bg: #f4efe6;
+  --surface: #fffdf8;
+  --ink: #1f2933;
+  --muted: #52606d;
+  --accent: #8c3d1f;
+  --accent-soft: #e9c7b7;
+  --border: #d9c8bb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top right, rgba(140, 61, 31, 0.12), transparent 30%),
+    linear-gradient(180deg, #f8f4ed 0%, var(--bg) 100%);
+  min-height: 100vh;
+}
+
+.page-shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.hero,
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(31, 41, 51, 0.08);
+}
+
+.hero {
+  padding: 2rem;
+}
+
+.card {
+  padding: 1.5rem;
+  margin-top: 1.25rem;
+}
+
+.nav {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.button {
+  display: inline-block;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+}
+
+.button.secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.grid.two {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+label,
+input {
+  display: block;
+  width: 100%;
+}
+
+label {
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+input {
+  margin-bottom: 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+code {
+  background: #f1e5db;
+  padding: 0.15rem 0.35rem;
+  border-radius: 6px;
+}
+

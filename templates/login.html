@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Login</h1>
+  <p class="muted">Starter form only. Authentication logic will be added next.</p>
+  <form method="post" action="#">
+    <label for="identifier">Username or Email</label>
+    <input id="identifier" name="identifier" type="text" autocomplete="username">
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password">
+
+    <button class="button" type="submit">Sign In</button>
+  </form>
+</section>
+{% endblock %}
+

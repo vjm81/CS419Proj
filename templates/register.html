@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Register</h1>
+  <p class="muted">Starter form based on the assignment validation requirements.</p>
+  <form method="post" action="#">
+    <label for="username">Username</label>
+    <input id="username" name="username" type="text" minlength="3" maxlength="20">
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email">
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" minlength="12" autocomplete="new-password">
+
+    <label for="confirm_password">Confirm Password</label>
+    <input id="confirm_password" name="confirm_password" type="password" minlength="12" autocomplete="new-password">
+
+    <button class="button" type="submit">Create Account</button>
+  </form>
+</section>
+{% endblock %}
+
