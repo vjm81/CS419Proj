@@ -6,12 +6,12 @@
 <section class="panel">
   <h1>Login</h1>
   <p class="muted">Basic sign-in form. Authentication logic will be added next.</p>
-  <form method="post" action="#">
+  <form method="post" action="{{ url_for('login') }}">
     <label for="identifier">Username or Email</label>
-    <input id="identifier" name="identifier" type="text" autocomplete="username">
+    <input id="identifier" name="identifier" type="text" autocomplete="username" required>
 
     <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="current-password">
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
 
     <button type="submit">Sign In</button>
   </form>

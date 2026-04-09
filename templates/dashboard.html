@@ -16,8 +16,8 @@
 <section class="panel grid two">
   <article>
     <h3>Account Summary</h3>
-    <p>Username: sample_user</p>
-    <p>System Role: user</p>
+    <p>Username: {{ g.current_user.username }}</p>
+    <p>System Role: {{ g.current_user.role }}</p>
     <p>Session Status: active</p>
   </article>
   <article>

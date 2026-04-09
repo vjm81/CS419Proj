@@ -6,18 +6,18 @@
 <section class="panel">
   <h1>Register</h1>
   <p class="muted">Basic account creation form using the project password requirements.</p>
-  <form method="post" action="#">
+  <form method="post" action="{{ url_for('register') }}">
     <label for="username">Username</label>
-    <input id="username" name="username" type="text" minlength="3" maxlength="20">
+    <input id="username" name="username" type="text" minlength="3" maxlength="20" required>
 
     <label for="email">Email</label>
-    <input id="email" name="email" type="email" autocomplete="email">
+    <input id="email" name="email" type="email" autocomplete="email" required>
 
     <label for="password">Password</label>
-    <input id="password" name="password" type="password" minlength="12" autocomplete="new-password">
+    <input id="password" name="password" type="password" minlength="12" autocomplete="new-password" required>
 
     <label for="confirm_password">Confirm Password</label>
-    <input id="confirm_password" name="confirm_password" type="password" minlength="12" autocomplete="new-password">
+    <input id="confirm_password" name="confirm_password" type="password" minlength="12" autocomplete="new-password" required>
 
     <button type="submit">Create Account</button>
   </form>
