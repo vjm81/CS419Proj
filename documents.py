@@ -25,3 +25,48 @@ def create_document(file, owner_id):
     stored_filename = f"{uuid.uuid4()}.enc"
 
     filepath = os.path.join(FILES_DIR, stored_filename)
+
+    file.save(filepath)
+    documents[doc_id] = {
+        "id": doc_id,
+        "filename": file.filename,
+        "stored_filename": stored_filename,
+        "owner_id": owner_id,
+        "shared_with": [],
+        "created_at": time.time(),
+        "updated_at": time.time(),
+        "version": 1,
+        "is_deleted": False
+    }
+    save_documents(documents)
+    return doc_id
+
+def get_document(doc_id):
+    documents = load_documents()
+        return documents.get(doc_id)
+    
+def can_user_access(doc, user_id):
+    if doc['owner_id'] == user_id:
+        return True
+        
+    for entry in doc['shared_with']:
+        if entry['user_id'] == user_id:
+            return True
+            
+    return False
+    
+def share_document(doc_id, target_user_id, role):
+    documents = load_documents()
+    if doc_id not in documents:
+        return False
+        
+    doc = documents[doc_id]
+    for entry in doc['shared_with']:
+        if entry['user_id'] == target_user_id:
+            entry['role'] = role
+            save_documents(documents)
+            return True
+    doc['shared_with'].append({
+        "user_id": target_user_id,
+        "role": role
+    })
