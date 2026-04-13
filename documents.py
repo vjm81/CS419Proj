@@ -43,7 +43,7 @@ def create_document(file, owner_id):
 
 def get_document(doc_id):
     documents = load_documents()
-        return documents.get(doc_id)
+    return documents.get(doc_id)
     
 def can_user_access(doc, user_id):
     if doc['owner_id'] == user_id:
@@ -70,3 +70,21 @@ def share_document(doc_id, target_user_id, role):
         "user_id": target_user_id,
         "role": role
     })
+
+    doc['updated_at'] = time.time()
+    save_documents(documents)
+    return True
+
+def get_user_documents(user_id):
+    documents = load_documents()
+    user_docs = []
+    for doc in documents.values():
+        if doc['is_deleted']:
+            continue
+        if doc['owner_id'] == user_id or can_user_access(doc, user_id):
+            user_docs.append(doc)
+
+    return user_docs
+
+def get_file_path(doc):
+    return os.path.join(FILES_DIR, doc['stored_filename'])
