@@ -10,6 +10,7 @@ from flask import Flask, flash, g, make_response, redirect, render_template, req
 from auth import AuthManager
 from config import Config
 
+from documents import create_document, get_user_documents
 
 def ensure_project_files(app: Flask) -> None:
     data_dir = Path(app.config["DATA_DIR"])
@@ -216,6 +217,19 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     @login_required
     @role_required("admin", "user")
     def documents():
+        if request.method == "POST":
+            file = request.files.get("document")
+
+            if not file:
+                flash("No file uploaded.", "error")
+                return redirect(url_for("documents"))
+            user_id = g.current_user["id"]
+
+            create_document(file, user_id)
+            flash("File uploaded successfully.", "success")
+            return redirect(url_for("documents"))
+        user_id = g.current_user["id"]
+        docs = get_user_documents(user_id)
         return render_template("documents.html")
 
     @app.get("/sharing")
