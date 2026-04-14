@@ -27,4 +27,22 @@
     <p>Recent Security Alerts: 0</p>
   </article>
 </section>
+
+<section class="panel">
+  <h3>Your Documents</h3>
+
+  {% if documents %}
+    <ul>
+      {% for doc in documents %}
+        <li>
+          {{ doc.filename }}
+          <!-- Download button comes later -->
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No documents uploaded yet.</p>
+  {% endif %}
+</section>
+
 {% endblock %}

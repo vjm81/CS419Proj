@@ -30,7 +30,7 @@ def ensure_project_files(app: Flask) -> None:
     default_json_files = {
         data_dir / "users.json": [],
         data_dir / "sessions.json": {},
-        data_dir / "documents.json": [],
+        data_dir / "documents.json": {},
         data_dir / "shares.json": [],
         data_dir / "audit_trail.json": [],
     }
