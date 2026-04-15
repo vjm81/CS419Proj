@@ -11,12 +11,12 @@
 <section class="panel grid two">
   <article>
     <h3>Upload Document</h3>
-    <form method="post" action="#" enctype="multipart/form-data">
+    <form method="post" action="{{ url_for('documents') }}" enctype="multipart/form-data">
       <label for="document_name">Document Name</label>
       <input id="document_name" name="document_name" type="text">
 
       <label for="document_file">Choose File</label>
-      <input id="document_file" name="document_file" type="file">
+      <input id="document_file" name="document_file" type="file" required>
 
       <label for="document_notes">Notes</label>
       <textarea id="document_notes" name="document_notes" rows="4"></textarea>
@@ -37,15 +37,22 @@
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td>Example.pdf</td>
-          <td>1</td>
-          <td>sample_user</td>
-          <td><a href="#">Download</a></td>
-        </tr>
+        {% if documents %}
+          {% for doc in documents %}
+          <tr>
+            <td>{{ doc.filename }}</td>
+            <td>{{ doc.version }}</td>
+            <td>{{ doc.owner_id }}</td>
+            <td><span class="muted">Download later</span></td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="4">No documents uploaded yet.</td>
+          </tr>
+        {% endif %}
       </tbody>
     </table>
   </article>
 </section>
 {% endblock %}
-

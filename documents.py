@@ -2,34 +2,63 @@ import os
 import json
 import uuid
 import time
+from pathlib import Path
 
-DATA_FILE = 'data/documents.json'
-FILES_DIR = 'files/'
+from flask import current_app
+from werkzeug.utils import secure_filename
 
-os.makedirs(FILES_DIR, exist_ok=True)
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_DATA_FILE = BASE_DIR / "data" / "documents.json"
+DEFAULT_FILES_DIR = BASE_DIR / "files"
+
+
+def get_documents_file():
+    try:
+        return Path(current_app.config["DATA_DIR"]) / "documents.json"
+    except RuntimeError:
+        return DEFAULT_DATA_FILE
+
+
+def get_files_dir():
+    try:
+        files_dir = Path(current_app.config["UPLOAD_DIR"])
+    except RuntimeError:
+        files_dir = DEFAULT_FILES_DIR
+    files_dir.mkdir(parents=True, exist_ok=True)
+    return files_dir
 
 def load_documents():
+    data_file = get_documents_file()
     try:
-        with open(DATA_FILE, 'r') as f:
-            return json.load(f)
-    except:
-        return []
+        with open(data_file, 'r', encoding='utf-8') as f:
+            documents = json.load(f)
+            if isinstance(documents, list):
+                return {}
+            return documents
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
     
 def save_documents(documents):
-    with open(DATA_FILE, 'w') as f:
+    data_file = get_documents_file()
+    with open(data_file, 'w', encoding='utf-8') as f:
         json.dump(documents, f, indent=4)
 
 def create_document(file, owner_id):
     documents = load_documents()
+    files_dir = get_files_dir()
     doc_id = str(uuid.uuid4())
-    stored_filename = f"{uuid.uuid4()}.enc"
+    original_filename = secure_filename(file.filename or "")
+    if not original_filename:
+        raise ValueError("Invalid filename.")
 
-    filepath = os.path.join(FILES_DIR, stored_filename)
+    stored_filename = f"{uuid.uuid4()}_{original_filename}"
+
+    filepath = files_dir / stored_filename
 
     file.save(filepath)
     documents[doc_id] = {
         "id": doc_id,
-        "filename": file.filename,
+        "filename": original_filename,
         "stored_filename": stored_filename,
         "owner_id": owner_id,
         "shared_with": [],
@@ -87,4 +116,4 @@ def get_user_documents(user_id):
     return user_docs
 
 def get_file_path(doc):
-    return os.path.join(FILES_DIR, doc['stored_filename'])
+    return str(get_files_dir() / doc['stored_filename'])

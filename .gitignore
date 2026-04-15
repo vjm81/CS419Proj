@@ -8,7 +8,8 @@ instance/
 secret.key
 *.pem
 *.log
+files/
+.vscode/
 docs/*.pdf
 presentation/*.pdf
 presentation/*.pptx
-

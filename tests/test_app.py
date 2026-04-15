@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 
 from app import create_app
 from config import Config
@@ -174,3 +175,32 @@ def test_guest_cannot_access_user_only_pages(tmp_path):
 
     assert documents_response.status_code == 403
     assert dashboard_response.status_code == 200
+
+
+def test_document_upload_and_listing(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    register(client)
+    login(client)
+
+    response = client.post(
+        "/documents",
+        data={
+            "document_name": "notes",
+            "document_notes": "starter upload",
+            "document_file": (BytesIO(b"hello world"), "notes.txt"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/documents")
+
+    listing = client.get("/documents")
+    assert listing.status_code == 200
+    assert b"notes.txt" in listing.data
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    assert len(documents) == 1

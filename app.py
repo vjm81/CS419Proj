@@ -211,26 +211,32 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     @login_required
     @role_required("admin", "user", "guest")
     def dashboard():
-        return render_template("dashboard.html")
+        documents = get_user_documents(g.current_user["id"])
+        return render_template("dashboard.html", documents=documents)
 
-    @app.get("/documents")
+    @app.route("/documents", methods=["GET", "POST"])
     @login_required
     @role_required("admin", "user")
     def documents():
         if request.method == "POST":
-            file = request.files.get("document")
+            file = request.files.get("document_file")
 
-            if not file:
+            if not file or not file.filename:
                 flash("No file uploaded.", "error")
                 return redirect(url_for("documents"))
             user_id = g.current_user["id"]
 
-            create_document(file, user_id)
+            try:
+                create_document(file, user_id)
+            except ValueError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("documents"))
+
             flash("File uploaded successfully.", "success")
             return redirect(url_for("documents"))
         user_id = g.current_user["id"]
         docs = get_user_documents(user_id)
-        return render_template("documents.html")
+        return render_template("documents.html", documents=docs)
 
     @app.get("/sharing")
     @login_required
