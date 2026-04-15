@@ -160,7 +160,11 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
         filepath = get_file_path(doc)
 
-        return send_file(filepath, as_attachment=True)
+        return send_file(
+            filepath,
+            as_attachment=True,
+            download_name=doc["filename"]
+            )
 
     @app.get("/")
     def index():
