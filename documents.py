@@ -60,6 +60,8 @@ def create_document(file, owner_id):
 
     filepath = files_dir / stored_filename
 
+    # Right now uploads still save in plain form. The next encryption step will swap this
+    # for the helper in encryption.py so the file bytes are encrypted before being written.
     file.save(filepath)
     documents[doc_id] = {
         "id": doc_id,
@@ -122,4 +124,6 @@ def get_user_documents(user_id):
     return user_docs
 
 def get_file_path(doc):
+    # This currently returns the on-disk upload path. Once encryption is wired in,
+    # downloads should read the encrypted file and decrypt it before sending it back.
     return str(get_files_dir() / doc['stored_filename'])
