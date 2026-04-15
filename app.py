@@ -4,13 +4,14 @@ import json
 import logging
 from functools import wraps
 from pathlib import Path
+from pydoc import doc
 
-from flask import Flask, flash, g, make_response, redirect, render_template, request, url_for
+from flask import Flask, flash, g, make_response, redirect, render_template, request, url_for, send_file
 
 from auth import AuthManager
 from config import Config
 
-from documents import create_document, get_user_documents
+from documents import create_document, get_user_documents, get_document, can_user_access, get_file_path
 
 def ensure_project_files(app: Flask) -> None:
     data_dir = Path(app.config["DATA_DIR"])
@@ -145,6 +146,21 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 "max-age=31536000; includeSubDomains"
             )
         return response
+
+    @app.get("/download/<doc_id>")
+    @login_required
+    def download(doc_id):
+        doc = get_document(doc_id)
+
+        if not doc:
+            return "Document not found", 404
+
+        if not can_user_access(doc, g.current_user["id"]):
+            return "Forbidden", 403
+
+        filepath = get_file_path(doc)
+
+        return send_file(filepath, as_attachment=True)
 
     @app.get("/")
     def index():
