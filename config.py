@@ -13,6 +13,7 @@ class Config:
     APP_PORT = int(os.getenv("APP_PORT", "5000"))
     SESSION_TIMEOUT = int(os.getenv("SESSION_TIMEOUT", "1800"))
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(16 * 1024 * 1024)))
+    ENCRYPTION_KEY_FILE = Path(os.getenv("ENCRYPTION_KEY_FILE", BASE_DIR / "secret.key"))
 
     DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
     LOG_DIR = Path(os.getenv("LOG_DIR", BASE_DIR / "logs"))
@@ -32,4 +33,3 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     SESSION_COOKIE_SECURE = True
-
