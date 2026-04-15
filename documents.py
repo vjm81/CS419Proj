@@ -14,6 +14,7 @@ DEFAULT_FILES_DIR = BASE_DIR / "files"
 
 def get_documents_file():
     try:
+        # I use the app config path here so tests and the real app both read the same documents file.
         return Path(current_app.config["DATA_DIR"]) / "documents.json"
     except RuntimeError:
         return DEFAULT_DATA_FILE
@@ -21,6 +22,7 @@ def get_documents_file():
 
 def get_files_dir():
     try:
+        # This keeps uploaded files inside the app's configured upload folder instead of a random hardcoded path.
         files_dir = Path(current_app.config["UPLOAD_DIR"])
     except RuntimeError:
         files_dir = DEFAULT_FILES_DIR
@@ -32,6 +34,7 @@ def load_documents():
     try:
         with open(data_file, 'r', encoding='utf-8') as f:
             documents = json.load(f)
+            # I normalize old list-based data to an empty dict because the rest of this file stores docs by id.
             if isinstance(documents, list):
                 return {}
             return documents
@@ -47,10 +50,12 @@ def create_document(file, owner_id):
     documents = load_documents()
     files_dir = get_files_dir()
     doc_id = str(uuid.uuid4())
+    # I clean the original filename first so weird path characters do not get written to disk.
     original_filename = secure_filename(file.filename or "")
     if not original_filename:
         raise ValueError("Invalid filename.")
 
+    # The stored filename gets a UUID prefix so two users can upload files with the same visible name safely.
     stored_filename = f"{uuid.uuid4()}_{original_filename}"
 
     filepath = files_dir / stored_filename
@@ -110,6 +115,7 @@ def get_user_documents(user_id):
     for doc in documents.values():
         if doc['is_deleted']:
             continue
+        # A user should see their own files plus files that were explicitly shared with them.
         if doc['owner_id'] == user_id or can_user_access(doc, user_id):
             user_docs.append(doc)
 

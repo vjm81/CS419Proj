@@ -211,6 +211,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     @login_required
     @role_required("admin", "user", "guest")
     def dashboard():
+        # I load the current user's documents here so the dashboard can show real data instead of placeholders.
         documents = get_user_documents(g.current_user["id"])
         return render_template("dashboard.html", documents=documents)
 
@@ -219,6 +220,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     @role_required("admin", "user")
     def documents():
         if request.method == "POST":
+            # This has to match the file input name in the template or Flask will not find the uploaded file.
             file = request.files.get("document_file")
 
             if not file or not file.filename:
@@ -227,6 +229,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             user_id = g.current_user["id"]
 
             try:
+                # The helper handles filename cleanup plus saving metadata into documents.json.
                 create_document(file, user_id)
             except ValueError as exc:
                 flash(str(exc), "error")
