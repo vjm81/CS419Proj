@@ -10,6 +10,7 @@ from flask import Flask, flash, g, make_response, redirect, render_template, req
 
 from auth import AuthManager
 from config import Config
+from audit import log_event
 
 from documents import (
     can_user_access,
