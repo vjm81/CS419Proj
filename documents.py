@@ -1,4 +1,3 @@
-import os
 import json
 import uuid
 import time
@@ -7,9 +6,12 @@ from pathlib import Path
 from flask import current_app
 from werkzeug.utils import secure_filename
 
+from encryption import EncryptedFileStorage
+
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_FILE = BASE_DIR / "data" / "documents.json"
-DEFAULT_FILES_DIR = BASE_DIR / "files"
+DEFAULT_FILES_DIR = BASE_DIR / "data" / "encrypted"
+DEFAULT_KEY_FILE = BASE_DIR / "secret.key"
 
 
 def get_documents_file():
@@ -22,12 +24,20 @@ def get_documents_file():
 
 def get_files_dir():
     try:
-        # This keeps uploaded files inside the app's configured upload folder instead of a random hardcoded path.
-        files_dir = Path(current_app.config["UPLOAD_DIR"])
+        # This keeps encrypted uploads inside the app's configured encrypted folder.
+        files_dir = Path(current_app.config["ENCRYPTED_DIR"])
     except RuntimeError:
         files_dir = DEFAULT_FILES_DIR
     files_dir.mkdir(parents=True, exist_ok=True)
     return files_dir
+
+
+def get_encrypted_storage():
+    try:
+        key_file = Path(current_app.config["ENCRYPTION_KEY_FILE"])
+    except RuntimeError:
+        key_file = DEFAULT_KEY_FILE
+    return EncryptedFileStorage(key_file)
 
 def load_documents():
     data_file = get_documents_file()
@@ -49,6 +59,7 @@ def save_documents(documents):
 def create_document(file, owner_id):
     documents = load_documents()
     files_dir = get_files_dir()
+    encrypted_storage = get_encrypted_storage()
     doc_id = str(uuid.uuid4())
     # I clean the original filename first so weird path characters do not get written to disk.
     original_filename = secure_filename(file.filename or "")
@@ -60,9 +71,8 @@ def create_document(file, owner_id):
 
     filepath = files_dir / stored_filename
 
-    # Right now uploads still save in plain form. The next encryption step will swap this
-    # for the helper in encryption.py so the file bytes are encrypted before being written.
-    file.save(filepath)
+    # To meet the data-at-rest requirement, I encrypt the uploaded bytes before writing them to disk.
+    encrypted_storage.encrypt_to_file(filepath, file.read())
     documents[doc_id] = {
         "id": doc_id,
         "filename": original_filename,
@@ -124,6 +134,9 @@ def get_user_documents(user_id):
     return user_docs
 
 def get_file_path(doc):
-    # This currently returns the on-disk upload path. Once encryption is wired in,
-    # downloads should read the encrypted file and decrypt it before sending it back.
     return str(get_files_dir() / doc['stored_filename'])
+
+
+def get_decrypted_file_bytes(doc):
+    encrypted_storage = get_encrypted_storage()
+    return encrypted_storage.decrypt_from_file(get_file_path(doc))

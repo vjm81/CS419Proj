@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+from io import BytesIO
 import json
 import logging
 from functools import wraps
 from pathlib import Path
-from pydoc import doc
 
-from flask import Flask, flash, g, make_response, redirect, render_template, request, url_for, send_file
+from flask import Flask, flash, g, make_response, redirect, render_template, request, send_file, url_for
 
 from auth import AuthManager
 from config import Config
 
-from documents import create_document, get_user_documents, get_document, can_user_access, get_file_path
+from documents import (
+    can_user_access,
+    create_document,
+    get_decrypted_file_bytes,
+    get_document,
+    get_user_documents,
+)
 
 def ensure_project_files(app: Flask) -> None:
     data_dir = Path(app.config["DATA_DIR"])
@@ -158,13 +164,12 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         if not can_user_access(doc, g.current_user["id"]):
             return "Forbidden", 403
 
-        filepath = get_file_path(doc)
-
         return send_file(
-            filepath,
+            BytesIO(get_decrypted_file_bytes(doc)),
+            mimetype="application/octet-stream",
             as_attachment=True,
-            download_name=doc["filename"]
-            )
+            download_name=doc["filename"],
+        )
 
     @app.get("/")
     def index():

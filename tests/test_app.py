@@ -204,3 +204,33 @@ def test_document_upload_and_listing(tmp_path):
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     assert len(documents) == 1
+    stored_filename = next(iter(documents.values()))["stored_filename"]
+    stored_bytes = (tmp_path / "data" / "encrypted" / stored_filename).read_bytes()
+    assert b"hello world" not in stored_bytes
+
+
+def test_document_download_returns_decrypted_file(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    register(client)
+    login(client)
+
+    client.post(
+        "/documents",
+        data={
+            "document_file": (BytesIO(b"secret document body"), "secret.txt"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+
+    response = client.get(f"/download/{doc_id}")
+
+    assert response.status_code == 200
+    assert response.data == b"secret document body"
+    assert "attachment" in response.headers["Content-Disposition"]
+    assert "secret.txt" in response.headers["Content-Disposition"]
