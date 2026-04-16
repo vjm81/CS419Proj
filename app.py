@@ -162,7 +162,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             return "Document not found", 404
 
         if not can_user_access(doc, g.current_user["id"]):
+            log_event("ACCESS_DENIED", g.current_user["id"], doc_id) #{"doc_id": doc_id}, client_ip(), client_agent(), severity="WARNING"
             return "Forbidden", 403
+        
+        log_event("FILE_DOWNLOAD", g.current_user["id"], doc_id, doc["filename"])
 
         return send_file(
             BytesIO(get_decrypted_file_bytes(doc)),

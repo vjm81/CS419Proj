@@ -6,6 +6,7 @@ from pathlib import Path
 from flask import current_app
 from werkzeug.utils import secure_filename
 
+from audit import log_event
 from encryption import EncryptedFileStorage
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -84,6 +85,8 @@ def create_document(file, owner_id):
         "version": 1,
         "is_deleted": False
     }
+
+    log_event("FILE_UPLOAD", owner_id, doc_id, original_filename)
     save_documents(documents)
     return doc_id
 
@@ -119,6 +122,7 @@ def share_document(doc_id, target_user_id, role):
 
     doc['updated_at'] = time.time()
     save_documents(documents)
+    log_event("FILE_SHARED", target_user_id, doc_id)
     return True
 
 def get_user_documents(user_id):
