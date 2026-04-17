@@ -15,9 +15,14 @@ from audit import log_event
 from documents import (
     can_user_access,
     create_document,
+    get_documents_shared_with_user,
     get_decrypted_file_bytes,
     get_document,
+    get_owned_documents,
     get_user_documents,
+    get_user_document_role,
+    load_documents,
+    share_document,
 )
 
 def ensure_project_files(app: Flask) -> None:
@@ -78,6 +83,12 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         security_log_file=Path(app.config["LOG_DIR"]) / "security.log",
         session_timeout=app.config["SESSION_TIMEOUT"],
     )
+
+    def get_all_users():
+        return auth_manager.load_users()
+
+    def find_user_by_username(username: str):
+        return auth_manager.find_user_by_username(username)
 
     def client_ip() -> str:
         return request.remote_addr or "unknown"
@@ -267,14 +278,60 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             flash("File uploaded successfully.", "success")
             return redirect(url_for("documents"))
         user_id = g.current_user["id"]
-        docs = get_user_documents(user_id)
-        return render_template("documents.html", documents=docs)
+        docs = get_owned_documents(user_id)
+        shared_docs = get_documents_shared_with_user(user_id)
+        return render_template("documents.html", documents=docs, shared_documents=shared_docs, get_user_document_role=get_user_document_role)
 
-    @app.get("/sharing")
+    @app.route("/sharing", methods=["GET", "POST"])
     @login_required
     @role_required("admin", "user")
     def sharing():
-        return render_template("sharing.html")
+        if request.method == "POST":
+            doc_id = request.form.get("share_document", "")
+            target_username = request.form.get("share_user", "").strip()
+            role = request.form.get("share_role", "")
+
+            if not doc_id or not target_username or not role:
+                flash("Please fill out all sharing fields.", "error")
+                return redirect(url_for("sharing"))
+
+            target_user = find_user_by_username(target_username)
+            if not target_user:
+                flash("Target user not found.", "error")
+                return redirect(url_for("sharing"))
+
+            try:
+                share_document(doc_id, g.current_user["id"], target_user["id"], role)
+            except ValueError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("sharing"))
+            except PermissionError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("sharing"))
+
+            flash(f"Shared document with {target_username} as {role}.", "success")
+            return redirect(url_for("sharing"))
+
+        owned_documents = get_owned_documents(g.current_user["id"])
+        all_documents = load_documents()
+        current_shares = []
+        for doc in owned_documents:
+            for entry in doc["shared_with"]:
+                shared_user = auth_manager.get_user_by_id(entry["user_id"])
+                current_shares.append(
+                    {
+                        "document_id": doc["id"],
+                        "filename": doc["filename"],
+                        "target_username": shared_user["username"] if shared_user else entry["user_id"],
+                        "role": entry["role"],
+                    }
+                )
+        return render_template(
+            "sharing.html",
+            owned_documents=owned_documents,
+            current_shares=current_shares,
+            all_users=[user for user in get_all_users() if user["id"] != g.current_user["id"]],
+        )
 
     @app.get("/audit")
     @login_required

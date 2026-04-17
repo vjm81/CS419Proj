@@ -43,6 +43,17 @@ def login(client, identifier="test_user", password="StrongPass123!"):
     )
 
 
+def upload_document(client, filename="notes.txt", contents=b"hello world"):
+    return client.post(
+        "/documents",
+        data={
+            "document_file": (BytesIO(contents), filename),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+
 def test_health_endpoint(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
@@ -184,16 +195,7 @@ def test_document_upload_and_listing(tmp_path):
     register(client)
     login(client)
 
-    response = client.post(
-        "/documents",
-        data={
-            "document_name": "notes",
-            "document_notes": "starter upload",
-            "document_file": (BytesIO(b"hello world"), "notes.txt"),
-        },
-        content_type="multipart/form-data",
-        follow_redirects=False,
-    )
+    response = upload_document(client)
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/documents")
@@ -216,14 +218,7 @@ def test_document_download_returns_decrypted_file(tmp_path):
     register(client)
     login(client)
 
-    client.post(
-        "/documents",
-        data={
-            "document_file": (BytesIO(b"secret document body"), "secret.txt"),
-        },
-        content_type="multipart/form-data",
-        follow_redirects=False,
-    )
+    upload_document(client, filename="secret.txt", contents=b"secret document body")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
@@ -234,3 +229,80 @@ def test_document_download_returns_decrypted_file(tmp_path):
     assert response.data == b"secret document body"
     assert "attachment" in response.headers["Content-Disposition"]
     assert "secret.txt" in response.headers["Content-Disposition"]
+
+
+def test_owner_can_share_document_with_viewer(tmp_path):
+    app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    viewer_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(viewer_client, username="viewer_user", email="viewer@example.com")
+    login(owner_client, identifier="owner_user")
+
+    upload_document(owner_client, filename="shared.txt", contents=b"shared data")
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+
+    share_response = owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "viewer_user",
+            "share_role": "viewer",
+        },
+        follow_redirects=False,
+    )
+
+    assert share_response.status_code == 302
+    updated_documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    shared_with = updated_documents[doc_id]["shared_with"]
+    assert shared_with[0]["role"] == "viewer"
+
+    login(viewer_client, identifier="viewer_user")
+    viewer_docs_page = viewer_client.get("/documents")
+    viewer_download = viewer_client.get(f"/download/{doc_id}")
+
+    assert viewer_docs_page.status_code == 200
+    assert b"shared.txt" in viewer_docs_page.data
+    assert viewer_download.status_code == 200
+    assert viewer_download.data == b"shared data"
+
+
+def test_non_owner_cannot_share_document(tmp_path):
+    app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    editor_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(editor_client, username="editor_user", email="editor@example.com")
+    login(owner_client, identifier="owner_user")
+    upload_document(owner_client, filename="project.txt", contents=b"project body")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+
+    owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "editor_user",
+            "share_role": "editor",
+        },
+        follow_redirects=False,
+    )
+
+    login(editor_client, identifier="editor_user")
+    share_attempt = editor_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "owner_user",
+            "share_role": "viewer",
+        },
+        follow_redirects=False,
+    )
+
+    assert share_attempt.status_code == 302
+    updated_documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    assert len(updated_documents[doc_id]["shared_with"]) == 1

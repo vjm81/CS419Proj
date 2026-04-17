@@ -5,26 +5,36 @@
 {% block content %}
 <section class="panel">
   <h2>Sharing</h2>
-  <p class="muted">Basic page for assigning document access to other users.</p>
+  <p class="muted">Share documents you own with other registered users.</p>
 </section>
 
 <section class="panel grid two">
   <article>
     <h3>Share a Document</h3>
-    <form method="post" action="#">
+    <form method="post" action="{{ url_for('sharing') }}">
       <label for="share_document">Document</label>
       <select id="share_document" name="share_document">
-        <option>Example.pdf</option>
+        {% if owned_documents %}
+          {% for doc in owned_documents %}
+          <option value="{{ doc.id }}">{{ doc.filename }}</option>
+          {% endfor %}
+        {% else %}
+          <option value="">No owned documents available</option>
+        {% endif %}
       </select>
 
       <label for="share_user">Share With User</label>
-      <input id="share_user" name="share_user" type="text">
+      <input id="share_user" name="share_user" type="text" list="shareable-users">
+      <datalist id="shareable-users">
+        {% for user in all_users %}
+        <option value="{{ user.username }}"></option>
+        {% endfor %}
+      </datalist>
 
       <label for="share_role">Permission</label>
       <select id="share_role" name="share_role">
         <option value="viewer">Viewer</option>
         <option value="editor">Editor</option>
-        <option value="owner">Owner</option>
       </select>
 
       <button type="submit">Share Document</button>
@@ -33,6 +43,7 @@
 
   <article>
     <h3>Current Shares</h3>
+    <p class="muted">Owned documents available to share: {{ owned_documents|length }}</p>
     <table>
       <thead>
         <tr>
@@ -42,14 +53,21 @@
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td>Example.pdf</td>
-          <td>teammate1</td>
-          <td>Viewer</td>
-        </tr>
+        {% if current_shares %}
+          {% for share in current_shares %}
+          <tr>
+            <td>{{ share.filename }}</td>
+            <td>{{ share.target_username }}</td>
+            <td>{{ share.role }}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="3">No documents have been shared yet.</td>
+          </tr>
+        {% endif %}
       </tbody>
     </table>
   </article>
 </section>
 {% endblock %}
-

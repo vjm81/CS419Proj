@@ -42,8 +42,8 @@
           <tr>
             <td>{{ doc.filename }}</td>
             <td>{{ doc.version }}</td>
-            <td>{{ doc.owner_id }}</td>
-            <td><span class="muted">Download later</span></td>
+            <td>{{ get_user_document_role(doc, g.current_user.id) }}</td>
+            <td><a href="{{ url_for('download', doc_id=doc.id) }}">Download</a></td>
           </tr>
           {% endfor %}
         {% else %}
@@ -54,5 +54,21 @@
       </tbody>
     </table>
   </article>
+</section>
+
+<section class="panel">
+  <h3>Shared With Me</h3>
+  {% if shared_documents %}
+    <ul>
+      {% for doc in shared_documents %}
+        <li>
+          {{ doc.filename }} ({{ get_user_document_role(doc, g.current_user.id) }})
+          - <a href="{{ url_for('download', doc_id=doc.id) }}">Download</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No documents have been shared with you yet.</p>
+  {% endif %}
 </section>
 {% endblock %}
