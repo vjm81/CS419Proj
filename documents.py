@@ -144,3 +144,25 @@ def get_file_path(doc):
 def get_decrypted_file_bytes(doc):
     encrypted_storage = get_encrypted_storage()
     return encrypted_storage.decrypt_from_file(get_file_path(doc))
+
+# Gets user role in a document: Works for both owner and shared
+def get_user_document_role(doc, user_id):
+    if doc["owner_id"] == user_id:
+        return "owner"
+
+    for entry in doc["shared_with"]:
+        if entry["user_id"] == user_id:
+            return entry["role"]
+
+    return None
+
+# Role Permissions
+def can_view_document(doc, user_id):
+    return get_user_document_role(doc, user_id) in {"owner", "editor", "viewer"}
+
+def can_edit_document(doc, user_id):
+    return get_user_document_role(doc, user_id) in {"owner", "editor"}
+
+def can_share_document(doc, user_id):
+    return get_user_document_role(doc, user_id) == "owner"
+
