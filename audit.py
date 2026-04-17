@@ -1,7 +1,7 @@
 import json
 import time
 from pathlib import Path
-from flask import current_app, request
+from flask import current_app, request, has_request_context
 
 def get_audit_file():
     return Path(current_app.config["DATA_DIR"]) / "audit_trail.json"
@@ -19,12 +19,13 @@ def save_audit(data):
 
 def log_event(event, user_id, doc_id=None, filename=None):
     logs = load_audit()
+    ip_address = request.remote_addr if has_request_context() else "unknown"
     logs.append({
         "event": event,
         "user_id": user_id,
         "doc_id": doc_id,
         "filename": filename,
         "timestamp": time.time(),
-        "ip_address": request.remote_addr
+        "ip_address": ip_address
     })
     save_audit(logs)
