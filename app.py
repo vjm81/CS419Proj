@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from io import BytesIO
 import json
 import logging
@@ -10,9 +11,10 @@ from flask import Flask, flash, g, make_response, redirect, render_template, req
 
 from auth import AuthManager
 from config import Config
-from audit import log_event
+from audit import get_recent_audit, log_event
 
 from documents import (
+    can_edit_document,
     can_user_access,
     create_document,
     get_documents_shared_with_user,
@@ -22,7 +24,9 @@ from documents import (
     get_user_documents,
     get_user_document_role,
     load_documents,
+    remove_share,
     share_document,
+    update_document,
 )
 
 def ensure_project_files(app: Flask) -> None:
@@ -89,6 +93,25 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     def find_user_by_username(username: str):
         return auth_manager.find_user_by_username(username)
+
+    def summarize_documents_for_user(user_id: str):
+        owned = get_owned_documents(user_id)
+        shared = get_documents_shared_with_user(user_id)
+        editable_shared = [doc for doc in shared if can_edit_document(doc, user_id)]
+        return owned, shared, editable_shared
+
+    def enrich_audit_entries(entries):
+        users_by_id = {user["id"]: user["username"] for user in get_all_users()}
+        return [
+            {
+                **entry,
+                "username": users_by_id.get(entry.get("user_id"), entry.get("user_id") or "unknown"),
+                "formatted_timestamp": datetime.fromtimestamp(
+                    entry.get("timestamp", 0)
+                ).strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            for entry in entries
+        ]
 
     def client_ip() -> str:
         return request.remote_addr or "unknown"
@@ -251,9 +274,23 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     @login_required
     @role_required("admin", "user", "guest")
     def dashboard():
-        # I load the current user's documents here so the dashboard can show real data instead of placeholders.
-        documents = get_user_documents(g.current_user["id"])
-        return render_template("dashboard.html", documents=documents)
+        user_id = g.current_user["id"]
+        owned_docs, shared_docs, editable_shared_docs = summarize_documents_for_user(user_id)
+        recent_events = enrich_audit_entries(
+            [
+                entry
+                for entry in get_recent_audit()
+                if g.current_user["role"] == "admin" or entry.get("user_id") == user_id
+            ][:5]
+        )
+        return render_template(
+            "dashboard.html",
+            documents=owned_docs,
+            shared_documents=shared_docs,
+            editable_shared_documents=editable_shared_docs,
+            recent_events=recent_events,
+            get_user_document_role=get_user_document_role,
+        )
 
     @app.route("/documents", methods=["GET", "POST"])
     @login_required
@@ -278,9 +315,38 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             flash("File uploaded successfully.", "success")
             return redirect(url_for("documents"))
         user_id = g.current_user["id"]
-        docs = get_owned_documents(user_id)
-        shared_docs = get_documents_shared_with_user(user_id)
-        return render_template("documents.html", documents=docs, shared_documents=shared_docs, get_user_document_role=get_user_document_role)
+        docs, shared_docs, editable_shared_docs = summarize_documents_for_user(user_id)
+        return render_template(
+            "documents.html",
+            documents=docs,
+            shared_documents=shared_docs,
+            editable_shared_documents=editable_shared_docs,
+            get_user_document_role=get_user_document_role,
+        )
+
+    @app.post("/documents/<doc_id>/update")
+    @login_required
+    @role_required("admin", "user")
+    def update_existing_document(doc_id):
+        file = request.files.get("document_file")
+        if not file or not file.filename:
+            flash("Please choose a file to upload as the new version.", "error")
+            return redirect(url_for("documents"))
+
+        try:
+            updated_doc = update_document(doc_id, g.current_user["id"], file)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("documents"))
+        except PermissionError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("documents"))
+
+        flash(
+            f"Uploaded version {updated_doc['version']} for {updated_doc['filename']}.",
+            "success",
+        )
+        return redirect(url_for("documents"))
 
     @app.route("/sharing", methods=["GET", "POST"])
     @login_required
@@ -313,7 +379,6 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             return redirect(url_for("sharing"))
 
         owned_documents = get_owned_documents(g.current_user["id"])
-        all_documents = load_documents()
         current_shares = []
         for doc in owned_documents:
             for entry in doc["shared_with"]:
@@ -323,7 +388,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                         "document_id": doc["id"],
                         "filename": doc["filename"],
                         "target_username": shared_user["username"] if shared_user else entry["user_id"],
+                        "target_user_id": entry["user_id"],
                         "role": entry["role"],
+                        "version": doc["version"],
                     }
                 )
         return render_template(
@@ -333,17 +400,64 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             all_users=[user for user in get_all_users() if user["id"] != g.current_user["id"]],
         )
 
+    @app.post("/sharing/remove")
+    @login_required
+    @role_required("admin", "user")
+    def remove_document_share():
+        doc_id = request.form.get("document_id", "")
+        target_user_id = request.form.get("target_user_id", "")
+        try:
+            remove_share(doc_id, g.current_user["id"], target_user_id)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("sharing"))
+        except PermissionError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("sharing"))
+
+        flash("Removed document access successfully.", "success")
+        return redirect(url_for("sharing"))
+
     @app.get("/audit")
     @login_required
     @role_required("admin", "user", "guest")
     def audit():
-        return render_template("audit.html")
+        audit_entries = enrich_audit_entries(get_recent_audit())
+        user_id = g.current_user["id"]
+        if g.current_user["role"] != "admin":
+            audit_entries = [
+                entry for entry in audit_entries
+                if entry.get("user_id") == user_id
+            ]
+
+        audit_summary = {
+            "total_events": len(audit_entries),
+            "downloads": sum(1 for entry in audit_entries if entry["event"] == "FILE_DOWNLOAD"),
+            "shares": sum(1 for entry in audit_entries if entry["event"] in {"FILE_SHARED", "FILE_UNSHARED"}),
+            "updates": sum(1 for entry in audit_entries if entry["event"] == "FILE_UPDATED"),
+        }
+        return render_template("audit.html", audit_entries=audit_entries, audit_summary=audit_summary)
 
     @app.get("/admin")
     @login_required
     @role_required("admin")
     def admin_panel():
-        return render_template("dashboard.html")
+        all_users = get_all_users()
+        all_documents = list(load_documents().values())
+        audit_entries = enrich_audit_entries(get_recent_audit(limit=10))
+        admin_summary = {
+            "total_users": len(all_users),
+            "total_documents": len(all_documents),
+            "active_shares": sum(len(doc.get("shared_with", [])) for doc in all_documents),
+        }
+        return render_template(
+            "admin.html",
+            all_users=all_users,
+            all_documents=all_documents,
+            audit_entries=audit_entries,
+            admin_summary=admin_summary,
+            get_user_document_role=get_user_document_role,
+        )
 
     @app.get("/health")
     def health():

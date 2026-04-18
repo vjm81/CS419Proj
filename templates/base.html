@@ -22,6 +22,9 @@
         <a href="{{ url_for('documents') }}">Documents</a>
         <a href="{{ url_for('sharing') }}">Sharing</a>
         <a href="{{ url_for('audit') }}">Audit Log</a>
+        {% if g.current_user and g.current_user.role == 'admin' %}
+        <a href="{{ url_for('admin_panel') }}">Admin</a>
+        {% endif %}
       </nav>
       {% if g.current_user %}
       <form method="post" action="{{ url_for('logout') }}">

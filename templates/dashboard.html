@@ -22,26 +22,64 @@
   </article>
   <article>
     <h3>Quick Summary</h3>
-    <p>Documents Owned: 0</p>
-    <p>Documents Shared With Me: 0</p>
-    <p>Recent Security Alerts: 0</p>
+    <p>Documents Owned: {{ documents|length }}</p>
+    <p>Documents Shared With Me: {{ shared_documents|length }}</p>
+    <p>Editable Shared Docs: {{ editable_shared_documents|length }}</p>
+  </article>
+</section>
+
+<section class="panel grid two">
+  <article>
+    <h3>Owned Documents</h3>
+    {% if documents %}
+      <ul>
+        {% for doc in documents %}
+          <li>{{ doc.filename }} (v{{ doc.version }})</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No documents uploaded yet.</p>
+    {% endif %}
+  </article>
+  <article>
+    <h3>Shared With Me</h3>
+    {% if shared_documents %}
+      <ul>
+        {% for doc in shared_documents %}
+          <li>{{ doc.filename }} ({{ get_user_document_role(doc, g.current_user.id) }})</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No shared documents yet.</p>
+    {% endif %}
   </article>
 </section>
 
 <section class="panel">
-  <h3>Your Documents</h3>
-
-  {% if documents %}
-    <ul>
-      {% for doc in documents %}
-        <li>
-          {{ doc.filename }}
-          <!-- Download button comes later -->
-        </li>
-      {% endfor %}
-    </ul>
+  <h3>Recent Activity</h3>
+  {% if recent_events %}
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Event</th>
+          <th>User</th>
+          <th>Document</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in recent_events %}
+        <tr>
+          <td>{{ entry.formatted_timestamp }}</td>
+          <td>{{ entry.event }}</td>
+          <td>{{ entry.username }}</td>
+          <td>{{ entry.filename or entry.doc_id or "N/A" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   {% else %}
-    <p class="muted">No documents uploaded yet.</p>
+    <p class="muted">No recent activity yet.</p>
   {% endif %}
 </section>
 

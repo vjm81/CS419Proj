@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Admin{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Admin Overview</h2>
+  <p class="muted">Admin-only summary of users, documents, sharing activity, and recent audit events.</p>
+</section>
+
+<section class="panel grid two">
+  <article>
+    <h3>System Summary</h3>
+    <p>Total Users: {{ admin_summary.total_users }}</p>
+    <p>Total Documents: {{ admin_summary.total_documents }}</p>
+    <p>Active Shares: {{ admin_summary.active_shares }}</p>
+  </article>
+  <article>
+    <h3>Admin Capabilities</h3>
+    <p class="muted">
+      This view is mainly for demoing that admins can review all content and user activity across the app.
+    </p>
+  </article>
+</section>
+
+<section class="panel">
+  <h3>Users</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Role</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in all_users %}
+      <tr>
+        <td>{{ user.username }}</td>
+        <td>{{ user.email }}</td>
+        <td>{{ user.role }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="panel">
+  <h3>All Documents</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Owner</th>
+        <th>Version</th>
+        <th>Shares</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in all_documents %}
+      <tr>
+        <td>{{ doc.filename }}</td>
+        <td>{{ doc.owner_id }}</td>
+        <td>{{ doc.version }}</td>
+        <td>{{ doc.shared_with|length }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="panel">
+  <h3>Recent Audit Events</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Event</th>
+        <th>User</th>
+        <th>Document</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in audit_entries %}
+      <tr>
+        <td>{{ entry.event }}</td>
+        <td>{{ entry.username }}</td>
+        <td>{{ entry.filename or entry.doc_id or "N/A" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

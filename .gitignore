@@ -1,4 +1,5 @@
 .env
+.venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -8,8 +9,11 @@ instance/
 secret.key
 *.pem
 *.log
+logs/
+data/encrypted/
 files/
 .vscode/
+tests/__pycache__/
 docs/*.pdf
 presentation/*.pdf
 presentation/*.pptx

@@ -29,3 +29,10 @@ def log_event(event, user_id, doc_id=None, filename=None):
         "ip_address": ip_address
     })
     save_audit(logs)
+
+
+def get_recent_audit(limit=None):
+    logs = sorted(load_audit(), key=lambda entry: entry.get("timestamp", 0), reverse=True)
+    if limit is not None:
+        return logs[:limit]
+    return logs

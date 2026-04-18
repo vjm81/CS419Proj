@@ -5,7 +5,7 @@
 {% block content %}
 <section class="panel">
   <h2>Sharing</h2>
-  <p class="muted">Share documents you own with other registered users.</p>
+  <p class="muted">Share documents you own, adjust access levels, and remove access when needed.</p>
 </section>
 
 <section class="panel grid two">
@@ -48,8 +48,10 @@
       <thead>
         <tr>
           <th>Document</th>
+          <th>Version</th>
           <th>User</th>
           <th>Permission</th>
+          <th>Manage</th>
         </tr>
       </thead>
       <tbody>
@@ -57,13 +59,31 @@
           {% for share in current_shares %}
           <tr>
             <td>{{ share.filename }}</td>
+            <td>{{ share.version }}</td>
             <td>{{ share.target_username }}</td>
-            <td>{{ share.role }}</td>
+            <td>
+              <form method="post" action="{{ url_for('sharing') }}">
+                <input type="hidden" name="share_document" value="{{ share.document_id }}">
+                <input type="hidden" name="share_user" value="{{ share.target_username }}">
+                <select name="share_role">
+                  <option value="viewer" {% if share.role == 'viewer' %}selected{% endif %}>Viewer</option>
+                  <option value="editor" {% if share.role == 'editor' %}selected{% endif %}>Editor</option>
+                </select>
+                <button type="submit">Update</button>
+              </form>
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('remove_document_share') }}">
+                <input type="hidden" name="document_id" value="{{ share.document_id }}">
+                <input type="hidden" name="target_user_id" value="{{ share.target_user_id }}">
+                <button type="submit">Remove</button>
+              </form>
+            </td>
           </tr>
           {% endfor %}
         {% else %}
           <tr>
-            <td colspan="3">No documents have been shared yet.</td>
+            <td colspan="5">No documents have been shared yet.</td>
           </tr>
         {% endif %}
       </tbody>

@@ -1,2 +1,34 @@
-[]
-
+[
+    {
+        "event": "FILE_UPLOAD",
+        "user_id": "8045d3da3a831a32",
+        "doc_id": "81dfd360-f749-4b4e-b9b9-1fb6ffd1ac90",
+        "filename": "images_1.jpg",
+        "timestamp": 1776546774.7787995,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_SHARED",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "81dfd360-f749-4b4e-b9b9-1fb6ffd1ac90",
+        "filename": "images_1.jpg",
+        "timestamp": 1776546949.4029353,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UNSHARED",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "81dfd360-f749-4b4e-b9b9-1fb6ffd1ac90",
+        "filename": "images_1.jpg",
+        "timestamp": 1776547096.5285974,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "8045d3da3a831a32",
+        "doc_id": "81dfd360-f749-4b4e-b9b9-1fb6ffd1ac90",
+        "filename": "images_1.jpg",
+        "timestamp": 1776547114.1629767,
+        "ip_address": "127.0.0.1"
+    }
+]

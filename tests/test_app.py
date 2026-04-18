@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from io import BytesIO
 
 from app import create_app
@@ -306,3 +307,212 @@ def test_non_owner_cannot_share_document(tmp_path):
     assert share_attempt.status_code == 302
     updated_documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     assert len(updated_documents[doc_id]["shared_with"]) == 1
+
+
+def test_owner_can_remove_document_share(tmp_path):
+    app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    viewer_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(viewer_client, username="viewer_user", email="viewer@example.com")
+    login(owner_client, identifier="owner_user")
+    upload_document(owner_client, filename="shared.txt", contents=b"shared data")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+    owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "viewer_user",
+            "share_role": "viewer",
+        },
+        follow_redirects=False,
+    )
+
+    viewer_id = json.loads((tmp_path / "data" / "users.json").read_text(encoding="utf-8"))[1]["id"]
+    remove_response = owner_client.post(
+        "/sharing/remove",
+        data={
+            "document_id": doc_id,
+            "target_user_id": viewer_id,
+        },
+        follow_redirects=False,
+    )
+
+    assert remove_response.status_code == 302
+
+    updated_documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    assert updated_documents[doc_id]["shared_with"] == []
+
+    login(viewer_client, identifier="viewer_user")
+    viewer_download = viewer_client.get(f"/download/{doc_id}")
+    assert viewer_download.status_code == 403
+
+
+def test_owner_can_upload_new_document_version(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    register(client)
+    login(client)
+    upload_document(client, filename="report.txt", contents=b"version one")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+
+    response = client.post(
+        f"/documents/{doc_id}/update",
+        data={
+            "document_file": (BytesIO(b"version two"), "report-v2.txt"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+
+    updated_documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    updated_doc = updated_documents[doc_id]
+    assert updated_doc["version"] == 2
+    assert updated_doc["filename"] == "report-v2.txt"
+    assert len(updated_doc["version_history"]) == 1
+    assert updated_doc["version_history"][0]["version"] == 1
+
+    download = client.get(f"/download/{doc_id}")
+    assert download.status_code == 200
+    assert download.data == b"version two"
+
+
+def test_editor_can_upload_new_document_version_for_shared_file(tmp_path):
+    app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    editor_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(editor_client, username="editor_user", email="editor@example.com")
+    login(owner_client, identifier="owner_user")
+    upload_document(owner_client, filename="shared-edit.txt", contents=b"original")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+
+    owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "editor_user",
+            "share_role": "editor",
+        },
+        follow_redirects=False,
+    )
+
+    login(editor_client, identifier="editor_user")
+    update_response = editor_client.post(
+        f"/documents/{doc_id}/update",
+        data={
+            "document_file": (BytesIO(b"editor update"), "shared-edit-v2.txt"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    assert update_response.status_code == 302
+
+    shared_page = editor_client.get("/documents")
+    updated_documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    updated_doc = updated_documents[doc_id]
+
+    assert updated_doc["version"] == 2
+    assert updated_doc["filename"] == "shared-edit-v2.txt"
+    assert b"shared-edit-v2.txt" in shared_page.data
+    assert b"Upload New Version" in shared_page.data
+
+
+def test_audit_page_shows_logged_events(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    register(client)
+    login(client)
+    upload_document(client, filename="audit.txt", contents=b"audit body")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+    client.get(f"/download/{doc_id}")
+
+    audit_page = client.get("/audit")
+
+    assert audit_page.status_code == 200
+    assert b"FILE_UPLOAD" in audit_page.data
+    assert b"FILE_DOWNLOAD" in audit_page.data
+    assert b"audit.txt" in audit_page.data
+
+
+def test_admin_panel_shows_all_content(tmp_path):
+    app = build_test_app(tmp_path)
+    admin_client = app.test_client()
+
+    register(admin_client, username="admin_user", email="admin@example.com")
+    users_path = tmp_path / "data" / "users.json"
+    users = json.loads(users_path.read_text(encoding="utf-8"))
+    users[0]["role"] = "admin"
+    users_path.write_text(json.dumps(users, indent=2), encoding="utf-8")
+
+    login(admin_client, identifier="admin_user")
+    upload_document(admin_client, filename="admin-report.txt", contents=b"admin body")
+
+    admin_page = admin_client.get("/admin")
+
+    assert admin_page.status_code == 200
+    assert b"Admin Overview" in admin_page.data
+    assert b"admin-report.txt" in admin_page.data
+    assert b"admin_user" in admin_page.data
+
+
+def test_non_admin_activity_views_only_show_own_events_with_timestamp(tmp_path):
+    app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    viewer_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(viewer_client, username="viewer_user", email="viewer@example.com")
+    login(owner_client, identifier="owner_user")
+    upload_document(owner_client, filename="privacy.txt", contents=b"private data")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+    owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "viewer_user",
+            "share_role": "viewer",
+        },
+        follow_redirects=False,
+    )
+
+    login(viewer_client, identifier="viewer_user")
+    viewer_client.get(f"/download/{doc_id}")
+
+    audit_log = json.loads((tmp_path / "data" / "audit_trail.json").read_text(encoding="utf-8"))
+    viewer_download_entry = next(
+        entry for entry in audit_log
+        if entry["event"] == "FILE_DOWNLOAD" and entry["user_id"] == json.loads((tmp_path / "data" / "users.json").read_text(encoding="utf-8"))[1]["id"]
+    )
+    expected_timestamp = datetime.fromtimestamp(
+        viewer_download_entry["timestamp"]
+    ).strftime("%Y-%m-%d %H:%M:%S").encode()
+
+    audit_page = viewer_client.get("/audit")
+    dashboard_page = viewer_client.get("/dashboard")
+
+    assert audit_page.status_code == 200
+    assert dashboard_page.status_code == 200
+    assert b"owner_user" not in audit_page.data
+    assert b"FILE_UPLOAD" not in audit_page.data
+    assert b"viewer_user" in audit_page.data
+    assert b"FILE_DOWNLOAD" in audit_page.data
+    assert expected_timestamp in audit_page.data
+    assert expected_timestamp in dashboard_page.data
