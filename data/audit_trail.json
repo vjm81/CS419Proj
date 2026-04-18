@@ -30,5 +30,37 @@
         "filename": "images_1.jpg",
         "timestamp": 1776547114.1629767,
         "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPLOAD",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "0b88c37b-5c23-4e4c-a6a8-0f1ca247af36",
+        "filename": "lc48795mb0kc1.jpeg",
+        "timestamp": 1776547984.7991152,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPLOAD",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "66445f99-a206-4ad5-89ff-d09a2160df7a",
+        "filename": "hamster",
+        "timestamp": 1776548223.470642,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPLOAD",
+        "user_id": "8045d3da3a831a32",
+        "doc_id": "56e63ef4-3735-4f94-b023-722857741454",
+        "filename": "images_1.jpg",
+        "timestamp": 1776548276.2743433,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPLOAD",
+        "user_id": "8045d3da3a831a32",
+        "doc_id": "47ab6eb4-17ea-40d0-a468-c5f378cda0d9",
+        "filename": "Media-Manipulation-and-Disinformation-Online-1.pdf",
+        "timestamp": 1776548280.731395,
+        "ip_address": "127.0.0.1"
     }
 ]

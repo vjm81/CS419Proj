@@ -59,8 +59,8 @@
     <tbody>
       {% for doc in all_documents %}
       <tr>
-        <td>{{ doc.filename }}</td>
-        <td>{{ doc.owner_id }}</td>
+        <td>{{ doc.display_name }}</td>
+        <td>{{ user_lookup.get(doc.owner_id, doc.owner_id) }}</td>
         <td>{{ doc.version }}</td>
         <td>{{ doc.shared_with|length }}</td>
       </tr>

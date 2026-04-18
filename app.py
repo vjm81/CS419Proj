@@ -307,7 +307,11 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
             try:
                 # The helper handles filename cleanup plus saving metadata into documents.json.
-                create_document(file, user_id)
+                create_document(
+                    file,
+                    user_id,
+                    document_name=request.form.get("document_name", ""),
+                )
             except ValueError as exc:
                 flash(str(exc), "error")
                 return redirect(url_for("documents"))
@@ -386,7 +390,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 current_shares.append(
                     {
                         "document_id": doc["id"],
-                        "filename": doc["filename"],
+                        "filename": doc["display_name"],
                         "target_username": shared_user["username"] if shared_user else entry["user_id"],
                         "target_user_id": entry["user_id"],
                         "role": entry["role"],
@@ -457,6 +461,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             audit_entries=audit_entries,
             admin_summary=admin_summary,
             get_user_document_role=get_user_document_role,
+            user_lookup={user["id"]: user["username"] for user in all_users},
         )
 
     @app.get("/health")

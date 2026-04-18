@@ -81,13 +81,15 @@ def save_share_index(shares):
     with open(shares_file, 'w', encoding='utf-8') as f:
         json.dump(shares, f, indent=4)
 
-def create_document(file, owner_id):
+def create_document(file, owner_id, document_name=None):
     documents = load_documents()
     doc_id = str(uuid.uuid4())
     original_filename, stored_filename = save_encrypted_upload(file)
     now = time.time()
+    display_name = (document_name or "").strip() or original_filename
     documents[doc_id] = {
         "id": doc_id,
+        "display_name": display_name,
         "filename": original_filename,
         "stored_filename": stored_filename,
         "owner_id": owner_id,
@@ -99,7 +101,7 @@ def create_document(file, owner_id):
         "is_deleted": False,
     }
 
-    log_event("FILE_UPLOAD", owner_id, doc_id, original_filename)
+    log_event("FILE_UPLOAD", owner_id, doc_id, display_name)
     save_documents(documents)
     return doc_id
 
@@ -147,7 +149,7 @@ def sync_share_index(documents):
                     "owner_id": doc["owner_id"],
                     "user_id": entry["user_id"],
                     "role": entry["role"],
-                    "filename": doc["filename"],
+                    "filename": doc["display_name"],
                     "updated_at": doc["updated_at"],
                 }
             )
@@ -280,6 +282,7 @@ def update_document(doc_id, user_id, file):
     doc.setdefault("version_history", []).append(
         {
             "version": doc["version"],
+            "display_name": doc["display_name"],
             "filename": doc["filename"],
             "stored_filename": doc["stored_filename"],
             "updated_at": doc["updated_at"],

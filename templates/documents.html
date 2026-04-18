@@ -40,7 +40,7 @@
         {% if documents %}
           {% for doc in documents %}
           <tr>
-            <td>{{ doc.filename }}</td>
+            <td>{{ doc.display_name }}</td>
             <td>{{ doc.version }}</td>
             <td>{{ get_user_document_role(doc, g.current_user.id) }}</td>
             <td>
@@ -56,7 +56,7 @@
                 <p class="muted">Previous versions: {{ doc.version_history|length }}</p>
                 <ul>
                   {% for old_version in doc.version_history|reverse %}
-                  <li>Version {{ old_version.version }} - {{ old_version.filename }}</li>
+                  <li>Version {{ old_version.version }} - {{ old_version.display_name or old_version.filename }}</li>
                   {% endfor %}
                 </ul>
                 {% endif %}
@@ -89,7 +89,7 @@
       <tbody>
         {% for doc in shared_documents %}
         <tr>
-          <td>{{ doc.filename }}</td>
+          <td>{{ doc.display_name }}</td>
           <td>{{ doc.version }}</td>
           <td>{{ get_user_document_role(doc, g.current_user.id) }}</td>
           <td>

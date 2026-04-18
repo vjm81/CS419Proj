@@ -212,6 +212,36 @@ def test_document_upload_and_listing(tmp_path):
     assert b"hello world" not in stored_bytes
 
 
+def test_document_uses_entered_name_in_lists(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    register(client)
+    login(client)
+
+    response = client.post(
+        "/documents",
+        data={
+            "document_name": "Project Proposal",
+            "document_file": (BytesIO(b"proposal body"), "proposal.pdf"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+
+    listing = client.get("/documents")
+    sharing_page = client.get("/sharing")
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    stored_doc = next(iter(documents.values()))
+
+    assert stored_doc["display_name"] == "Project Proposal"
+    assert b"Project Proposal" in listing.data
+    assert b"proposal.pdf" not in listing.data
+    assert b"Project Proposal" in sharing_page.data
+
+
 def test_document_download_returns_decrypted_file(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
@@ -469,6 +499,7 @@ def test_admin_panel_shows_all_content(tmp_path):
     assert b"Admin Overview" in admin_page.data
     assert b"admin-report.txt" in admin_page.data
     assert b"admin_user" in admin_page.data
+    assert b"owner_id" not in admin_page.data
 
 
 def test_non_admin_activity_views_only_show_own_events_with_timestamp(tmp_path):

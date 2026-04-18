@@ -16,7 +16,7 @@
       <select id="share_document" name="share_document">
         {% if owned_documents %}
           {% for doc in owned_documents %}
-          <option value="{{ doc.id }}">{{ doc.filename }}</option>
+          <option value="{{ doc.id }}">{{ doc.display_name }}</option>
           {% endfor %}
         {% else %}
           <option value="">No owned documents available</option>

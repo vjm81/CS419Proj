@@ -10,5 +10,56 @@
         "version": 1,
         "version_history": [],
         "is_deleted": false
+    },
+    "0b88c37b-5c23-4e4c-a6a8-0f1ca247af36": {
+        "id": "0b88c37b-5c23-4e4c-a6a8-0f1ca247af36",
+        "filename": "lc48795mb0kc1.jpeg",
+        "stored_filename": "36c52fd3-ec61-48de-9d43-ea1e3645d020_lc48795mb0kc1.jpeg",
+        "owner_id": "4782c42f88401bfa",
+        "shared_with": [],
+        "created_at": 1776547984.7991152,
+        "updated_at": 1776547984.7991152,
+        "version": 1,
+        "version_history": [],
+        "is_deleted": false
+    },
+    "66445f99-a206-4ad5-89ff-d09a2160df7a": {
+        "id": "66445f99-a206-4ad5-89ff-d09a2160df7a",
+        "display_name": "hamster",
+        "filename": "lc48795mb0kc1.jpeg",
+        "stored_filename": "68575038-832e-45c0-a5f1-ccedc1199d4c_lc48795mb0kc1.jpeg",
+        "owner_id": "4782c42f88401bfa",
+        "shared_with": [],
+        "created_at": 1776548223.4661355,
+        "updated_at": 1776548223.4661355,
+        "version": 1,
+        "version_history": [],
+        "is_deleted": false
+    },
+    "56e63ef4-3735-4f94-b023-722857741454": {
+        "id": "56e63ef4-3735-4f94-b023-722857741454",
+        "display_name": "images_1.jpg",
+        "filename": "images_1.jpg",
+        "stored_filename": "6476178f-11fc-46a9-8301-311ad3340d39_images_1.jpg",
+        "owner_id": "8045d3da3a831a32",
+        "shared_with": [],
+        "created_at": 1776548276.2727976,
+        "updated_at": 1776548276.2727976,
+        "version": 1,
+        "version_history": [],
+        "is_deleted": false
+    },
+    "47ab6eb4-17ea-40d0-a468-c5f378cda0d9": {
+        "id": "47ab6eb4-17ea-40d0-a468-c5f378cda0d9",
+        "display_name": "Media-Manipulation-and-Disinformation-Online-1.pdf",
+        "filename": "Media-Manipulation-and-Disinformation-Online-1.pdf",
+        "stored_filename": "d9e5b7d3-031c-44ca-8f54-0a6c8e54e452_Media-Manipulation-and-Disinformation-Online-1.pdf",
+        "owner_id": "8045d3da3a831a32",
+        "shared_with": [],
+        "created_at": 1776548280.726394,
+        "updated_at": 1776548280.726394,
+        "version": 1,
+        "version_history": [],
+        "is_deleted": false
     }
 }
