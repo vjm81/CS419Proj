@@ -6,10 +6,10 @@
         "owner_id": "8045d3da3a831a32",
         "shared_with": [],
         "created_at": 1776546774.7787995,
-        "updated_at": 1776547096.5275986,
+        "updated_at": 1776549681.4674408,
         "version": 1,
         "version_history": [],
-        "is_deleted": false
+        "is_deleted": true
     },
     "0b88c37b-5c23-4e4c-a6a8-0f1ca247af36": {
         "id": "0b88c37b-5c23-4e4c-a6a8-0f1ca247af36",
@@ -18,10 +18,10 @@
         "owner_id": "4782c42f88401bfa",
         "shared_with": [],
         "created_at": 1776547984.7991152,
-        "updated_at": 1776547984.7991152,
+        "updated_at": 1776549698.3023593,
         "version": 1,
         "version_history": [],
-        "is_deleted": false
+        "is_deleted": true
     },
     "66445f99-a206-4ad5-89ff-d09a2160df7a": {
         "id": "66445f99-a206-4ad5-89ff-d09a2160df7a",
@@ -39,14 +39,27 @@
     "56e63ef4-3735-4f94-b023-722857741454": {
         "id": "56e63ef4-3735-4f94-b023-722857741454",
         "display_name": "images_1.jpg",
-        "filename": "images_1.jpg",
-        "stored_filename": "6476178f-11fc-46a9-8301-311ad3340d39_images_1.jpg",
+        "filename": "lc48795mb0kc1.jpeg",
+        "stored_filename": "243481f6-78f6-4461-abed-c80fdf4155f9_lc48795mb0kc1.jpeg",
         "owner_id": "8045d3da3a831a32",
-        "shared_with": [],
+        "shared_with": [
+            {
+                "user_id": "4782c42f88401bfa",
+                "role": "editor"
+            }
+        ],
         "created_at": 1776548276.2727976,
-        "updated_at": 1776548276.2727976,
-        "version": 1,
-        "version_history": [],
+        "updated_at": 1776550748.0031004,
+        "version": 2,
+        "version_history": [
+            {
+                "version": 1,
+                "display_name": "images_1.jpg",
+                "filename": "images_1.jpg",
+                "stored_filename": "6476178f-11fc-46a9-8301-311ad3340d39_images_1.jpg",
+                "updated_at": 1776549860.3894596
+            }
+        ],
         "is_deleted": false
     },
     "47ab6eb4-17ea-40d0-a468-c5f378cda0d9": {
@@ -57,9 +70,9 @@
         "owner_id": "8045d3da3a831a32",
         "shared_with": [],
         "created_at": 1776548280.726394,
-        "updated_at": 1776548280.726394,
+        "updated_at": 1776549708.4107637,
         "version": 1,
         "version_history": [],
-        "is_deleted": false
+        "is_deleted": true
     }
 }

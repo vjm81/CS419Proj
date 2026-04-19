@@ -62,5 +62,109 @@
         "filename": "Media-Manipulation-and-Disinformation-Online-1.pdf",
         "timestamp": 1776548280.731395,
         "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DELETED",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": "81dfd360-f749-4b4e-b9b9-1fb6ffd1ac90",
+        "filename": "images_1.jpg",
+        "timestamp": 1776549681.4684458,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DELETED",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": "0b88c37b-5c23-4e4c-a6a8-0f1ca247af36",
+        "filename": "lc48795mb0kc1.jpeg",
+        "timestamp": 1776549698.3033643,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DELETED",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": "47ab6eb4-17ea-40d0-a468-c5f378cda0d9",
+        "filename": "Media-Manipulation-and-Disinformation-Online-1.pdf",
+        "timestamp": 1776549708.412268,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": "56e63ef4-3735-4f94-b023-722857741454",
+        "filename": "images_1.jpg",
+        "timestamp": 1776549718.554534,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "USER_ROLE_UPDATED",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": null,
+        "filename": "user2 -> guest",
+        "timestamp": 1776549740.8039002,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_SHARED",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "56e63ef4-3735-4f94-b023-722857741454",
+        "filename": "images_1.jpg",
+        "timestamp": 1776549827.5995262,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_SHARED",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "56e63ef4-3735-4f94-b023-722857741454",
+        "filename": "images_1.jpg",
+        "timestamp": 1776549838.960879,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_SHARED",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "56e63ef4-3735-4f94-b023-722857741454",
+        "filename": "images_1.jpg",
+        "timestamp": 1776549846.0990582,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_SHARED",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "56e63ef4-3735-4f94-b023-722857741454",
+        "filename": "images_1.jpg",
+        "timestamp": 1776549860.3959684,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "66445f99-a206-4ad5-89ff-d09a2160df7a",
+        "filename": "lc48795mb0kc1.jpeg",
+        "timestamp": 1776550707.7534282,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPDATED",
+        "user_id": "8045d3da3a831a32",
+        "doc_id": "56e63ef4-3735-4f94-b023-722857741454",
+        "filename": "lc48795mb0kc1.jpeg",
+        "timestamp": 1776550748.0041013,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "8045d3da3a831a32",
+        "doc_id": "56e63ef4-3735-4f94-b023-722857741454",
+        "filename": "lc48795mb0kc1.jpeg",
+        "timestamp": 1776550771.4635828,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": "56e63ef4-3735-4f94-b023-722857741454",
+        "filename": "lc48795mb0kc1.jpeg",
+        "timestamp": 1776550806.5781841,
+        "ip_address": "127.0.0.1"
     }
 ]

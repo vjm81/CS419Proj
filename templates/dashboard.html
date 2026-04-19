@@ -46,7 +46,7 @@
     {% if shared_documents %}
       <ul>
         {% for doc in shared_documents %}
-          <li>{{ doc.display_name }} ({{ get_user_document_role(doc, g.current_user.id) }})</li>
+          <li>{{ doc.display_name }} ({{ effective_document_role(doc, g.current_user) }})</li>
         {% endfor %}
       </ul>
     {% else %}

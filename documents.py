@@ -110,6 +110,13 @@ def get_document(doc_id):
     return documents.get(doc_id)
 
 
+def get_all_documents(include_deleted: bool = False):
+    documents = list(load_documents().values())
+    if include_deleted:
+        return documents
+    return [doc for doc in documents if not doc.get("is_deleted")]
+
+
 def get_user_document_role(doc, user_id):
     if doc["owner_id"] == user_id:
         return "owner"
@@ -212,6 +219,41 @@ def remove_share(doc_id, owner_id, target_user_id):
     sync_share_index(documents)
     log_event("FILE_UNSHARED", target_user_id, doc_id, doc["filename"])
     return doc
+
+
+def delete_document(doc_id, actor_id, allow_override: bool = False):
+    documents = load_documents()
+    doc = documents.get(doc_id)
+    if not doc or doc.get("is_deleted"):
+        raise ValueError("Document not found.")
+
+    if not allow_override and doc["owner_id"] != actor_id:
+        raise PermissionError("You do not have permission to delete this document.")
+
+    doc["is_deleted"] = True
+    doc["updated_at"] = time.time()
+    save_documents(documents)
+    sync_share_index(documents)
+    log_event("FILE_DELETED", actor_id, doc_id, doc.get("display_name", doc["filename"]))
+    return doc
+
+
+def remove_user_from_all_shares(target_user_id):
+    documents = load_documents()
+    changed = False
+    for doc in documents.values():
+        original_len = len(doc.get("shared_with", []))
+        doc["shared_with"] = [
+            entry for entry in doc.get("shared_with", [])
+            if entry["user_id"] != target_user_id
+        ]
+        if len(doc["shared_with"]) != original_len:
+            doc["updated_at"] = time.time()
+            changed = True
+
+    if changed:
+        save_documents(documents)
+        sync_share_index(documents)
 
 def get_user_documents(user_id):
     documents = load_documents()

@@ -17,14 +17,17 @@ from documents import (
     can_edit_document,
     can_user_access,
     create_document,
+    delete_document,
     get_documents_shared_with_user,
     get_decrypted_file_bytes,
     get_document,
+    get_all_documents,
     get_owned_documents,
     get_user_documents,
     get_user_document_role,
     load_documents,
     remove_share,
+    remove_user_from_all_shares,
     share_document,
     update_document,
 )
@@ -97,7 +100,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     def summarize_documents_for_user(user_id: str):
         owned = get_owned_documents(user_id)
         shared = get_documents_shared_with_user(user_id)
-        editable_shared = [doc for doc in shared if can_edit_document(doc, user_id)]
+        editable_shared = []
+        if not g.current_user or g.current_user["role"] != "guest":
+            editable_shared = [doc for doc in shared if can_edit_document(doc, user_id)]
         return owned, shared, editable_shared
 
     def enrich_audit_entries(entries):
@@ -112,6 +117,17 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             }
             for entry in entries
         ]
+
+    def effective_document_role(doc, user):
+        if not user:
+            return None
+
+        role = get_user_document_role(doc, user["id"])
+        if user.get("role") == "guest" and role == "editor":
+            # Guests stay read-only at the system level, so even if document metadata says
+            # editor we present it like viewer access in the UI.
+            return "viewer"
+        return role
 
     def client_ip() -> str:
         return request.remote_addr or "unknown"
@@ -193,10 +209,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     def download(doc_id):
         doc = get_document(doc_id)
 
-        if not doc:
+        if not doc or doc.get("is_deleted"):
             return "Document not found", 404
 
-        if not can_user_access(doc, g.current_user["id"]):
+        if g.current_user["role"] != "admin" and not can_user_access(doc, g.current_user["id"]):
             log_event("ACCESS_DENIED", g.current_user["id"], doc_id) #{"doc_id": doc_id}, client_ip(), client_agent(), severity="WARNING"
             return "Forbidden", 403
         
@@ -290,13 +306,17 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             editable_shared_documents=editable_shared_docs,
             recent_events=recent_events,
             get_user_document_role=get_user_document_role,
+            effective_document_role=effective_document_role,
         )
 
     @app.route("/documents", methods=["GET", "POST"])
     @login_required
-    @role_required("admin", "user")
+    @role_required("admin", "user", "guest")
     def documents():
         if request.method == "POST":
+            if g.current_user["role"] == "guest":
+                flash("Guest accounts can only view and download shared documents.", "error")
+                return redirect(url_for("documents"))
             # This has to match the file input name in the template or Flask will not find the uploaded file.
             file = request.files.get("document_file")
 
@@ -326,6 +346,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             shared_documents=shared_docs,
             editable_shared_documents=editable_shared_docs,
             get_user_document_role=get_user_document_role,
+            effective_document_role=effective_document_role,
         )
 
     @app.post("/documents/<doc_id>/update")
@@ -350,6 +371,23 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             f"Uploaded version {updated_doc['version']} for {updated_doc['filename']}.",
             "success",
         )
+        return redirect(url_for("documents"))
+
+    @app.post("/documents/<doc_id>/delete")
+    @login_required
+    @role_required("admin", "user")
+    def delete_existing_document(doc_id):
+        allow_override = g.current_user["role"] == "admin"
+        try:
+            deleted_doc = delete_document(doc_id, g.current_user["id"], allow_override=allow_override)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("documents"))
+        except PermissionError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("documents"))
+
+        flash(f"Deleted {deleted_doc['display_name']}.", "success")
         return redirect(url_for("documents"))
 
     @app.route("/sharing", methods=["GET", "POST"])
@@ -447,12 +485,13 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     @role_required("admin")
     def admin_panel():
         all_users = get_all_users()
-        all_documents = list(load_documents().values())
+        all_documents = get_all_documents(include_deleted=True)
         audit_entries = enrich_audit_entries(get_recent_audit(limit=10))
         admin_summary = {
             "total_users": len(all_users),
-            "total_documents": len(all_documents),
-            "active_shares": sum(len(doc.get("shared_with", [])) for doc in all_documents),
+            "total_documents": len([doc for doc in all_documents if not doc.get("is_deleted")]),
+            "deleted_documents": len([doc for doc in all_documents if doc.get("is_deleted")]),
+            "active_shares": sum(len(doc.get("shared_with", [])) for doc in all_documents if not doc.get("is_deleted")),
         }
         return render_template(
             "admin.html",
@@ -463,6 +502,44 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             get_user_document_role=get_user_document_role,
             user_lookup={user["id"]: user["username"] for user in all_users},
         )
+
+    @app.post("/admin/users/<user_id>/role")
+    @login_required
+    @role_required("admin")
+    def update_system_role(user_id):
+        if g.current_user["id"] == user_id:
+            flash("Admins cannot change their own role from this page.", "error")
+            return redirect(url_for("admin_panel"))
+
+        new_role = request.form.get("role", "")
+        try:
+            updated_user = auth_manager.update_user_role(user_id, new_role)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin_panel"))
+
+        log_event("USER_ROLE_UPDATED", g.current_user["id"], filename=f"{updated_user['username']} -> {new_role}")
+        flash(f"Updated {updated_user['username']} to role {new_role}.", "success")
+        return redirect(url_for("admin_panel"))
+
+    @app.post("/admin/users/<user_id>/delete")
+    @login_required
+    @role_required("admin")
+    def delete_user_account(user_id):
+        if g.current_user["id"] == user_id:
+            flash("Admins cannot delete their own account from this page.", "error")
+            return redirect(url_for("admin_panel"))
+
+        try:
+            removed_user = auth_manager.remove_user(user_id)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin_panel"))
+
+        remove_user_from_all_shares(user_id)
+        log_event("USER_REMOVED", g.current_user["id"], filename=removed_user["username"])
+        flash(f"Removed user {removed_user['username']}.", "success")
+        return redirect(url_for("admin_panel"))
 
     @app.get("/health")
     def health():

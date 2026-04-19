@@ -173,20 +173,77 @@ def test_logout_removes_session(tmp_path):
 
 def test_guest_cannot_access_user_only_pages(tmp_path):
     app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    guest_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(guest_client, username="guest_user", email="guest@example.com")
+    users_path = tmp_path / "data" / "users.json"
+    users = json.loads(users_path.read_text(encoding="utf-8"))
+    users[1]["role"] = "guest"
+    users_path.write_text(json.dumps(users, indent=2), encoding="utf-8")
+
+    login(owner_client, identifier="owner_user")
+    upload_document(owner_client, filename="guest-view.txt", contents=b"guest copy")
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+    owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "guest_user",
+            "share_role": "viewer",
+        },
+        follow_redirects=False,
+    )
+
+    login(guest_client, identifier="guest_user")
+    documents_response = guest_client.get("/documents")
+    dashboard_response = guest_client.get("/dashboard")
+    download_response = guest_client.get(f"/download/{doc_id}")
+    upload_attempt = upload_document(guest_client, filename="blocked.txt", contents=b"blocked")
+    update_attempt = guest_client.post(
+        f"/documents/{doc_id}/update",
+        data={"document_file": (BytesIO(b"new"), "new.txt")},
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    assert documents_response.status_code == 200
+    assert dashboard_response.status_code == 200
+    assert download_response.status_code == 200
+    assert b"guest-view.txt" in documents_response.data
+    assert b"Guest Access" in documents_response.data
+    assert b"Upload Document" not in documents_response.data
+    assert upload_attempt.status_code == 302
+    assert update_attempt.status_code == 403
+
+
+def test_guest_can_still_view_and_download_old_owned_documents(tmp_path):
+    app = build_test_app(tmp_path)
     client = app.test_client()
 
-    register(client, username="guest_user", email="guest@example.com")
+    register(client, username="guest_owner", email="guest-owner@example.com")
+    login(client, identifier="guest_owner")
+    upload_document(client, filename="owned-before-downgrade.txt", contents=b"owner bytes")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+
     users_path = tmp_path / "data" / "users.json"
     users = json.loads(users_path.read_text(encoding="utf-8"))
     users[0]["role"] = "guest"
     users_path.write_text(json.dumps(users, indent=2), encoding="utf-8")
 
-    login(client, identifier="guest_user")
-    documents_response = client.get("/documents")
-    dashboard_response = client.get("/dashboard")
+    documents_page = client.get("/documents")
+    allowed_download = client.get(f"/download/{doc_id}")
 
-    assert documents_response.status_code == 403
-    assert dashboard_response.status_code == 200
+    assert documents_page.status_code == 200
+    assert b"owned-before-downgrade.txt" in documents_page.data
+    assert b"Replace File" not in documents_page.data
+    assert b"Delete Document" not in documents_page.data
+    assert allowed_download.status_code == 200
+    assert allowed_download.data == b"owner bytes"
 
 
 def test_document_upload_and_listing(tmp_path):
@@ -500,6 +557,101 @@ def test_admin_panel_shows_all_content(tmp_path):
     assert b"admin-report.txt" in admin_page.data
     assert b"admin_user" in admin_page.data
     assert b"owner_id" not in admin_page.data
+
+
+def test_admin_can_download_and_delete_any_document(tmp_path):
+    app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    admin_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(admin_client, username="admin_user", email="admin@example.com")
+    users_path = tmp_path / "data" / "users.json"
+    users = json.loads(users_path.read_text(encoding="utf-8"))
+    users[1]["role"] = "admin"
+    users_path.write_text(json.dumps(users, indent=2), encoding="utf-8")
+
+    login(owner_client, identifier="owner_user")
+    upload_document(owner_client, filename="admin-target.txt", contents=b"admin target body")
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+
+    login(admin_client, identifier="admin_user")
+    download_response = admin_client.get(f"/download/{doc_id}")
+    delete_response = admin_client.post(f"/documents/{doc_id}/delete", follow_redirects=False)
+
+    assert download_response.status_code == 200
+    assert download_response.data == b"admin target body"
+    assert delete_response.status_code == 302
+
+    updated_documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    assert updated_documents[doc_id]["is_deleted"] is True
+
+    deleted_download = admin_client.get(f"/download/{doc_id}")
+    assert deleted_download.status_code == 404
+
+
+def test_admin_can_change_user_role_and_remove_user(tmp_path):
+    app = build_test_app(tmp_path)
+    admin_client = app.test_client()
+    target_client = app.test_client()
+
+    register(admin_client, username="admin_user", email="admin@example.com")
+    register(target_client, username="target_user", email="target@example.com")
+    users_path = tmp_path / "data" / "users.json"
+    users = json.loads(users_path.read_text(encoding="utf-8"))
+    users[0]["role"] = "admin"
+    users_path.write_text(json.dumps(users, indent=2), encoding="utf-8")
+
+    login(admin_client, identifier="admin_user")
+    updated_users = json.loads(users_path.read_text(encoding="utf-8"))
+    target_user = next(user for user in updated_users if user["username"] == "target_user")
+
+    upload_document(admin_client, filename="admin-share.txt", contents=b"admin shared body")
+    documents_path = tmp_path / "data" / "documents.json"
+    documents = json.loads(documents_path.read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+    admin_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "target_user",
+            "share_role": "viewer",
+        },
+        follow_redirects=False,
+    )
+
+    login(target_client, identifier="target_user")
+    sessions_before_delete = json.loads((tmp_path / "data" / "sessions.json").read_text(encoding="utf-8"))
+    assert any(session["user_id"] == target_user["id"] for session in sessions_before_delete.values())
+
+    role_response = admin_client.post(
+        f"/admin/users/{target_user['id']}/role",
+        data={"role": "guest"},
+        follow_redirects=False,
+    )
+    assert role_response.status_code == 302
+
+    updated_users = json.loads(users_path.read_text(encoding="utf-8"))
+    target_user = next(user for user in updated_users if user["username"] == "target_user")
+    assert target_user["role"] == "guest"
+
+    delete_response = admin_client.post(
+        f"/admin/users/{target_user['id']}/delete",
+        follow_redirects=False,
+    )
+    assert delete_response.status_code == 302
+
+    final_users = json.loads(users_path.read_text(encoding="utf-8"))
+    final_documents = json.loads(documents_path.read_text(encoding="utf-8"))
+    final_sessions = json.loads((tmp_path / "data" / "sessions.json").read_text(encoding="utf-8"))
+
+    assert all(user["username"] != "target_user" for user in final_users)
+    assert final_documents[doc_id]["shared_with"] == []
+    assert all(
+        session["user_id"] != target_user["id"]
+        for session in final_sessions.values()
+    )
 
 
 def test_non_admin_activity_views_only_show_own_events_with_timestamp(tmp_path):

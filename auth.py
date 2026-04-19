@@ -244,6 +244,43 @@ class AuthManager:
                 return user
         return None
 
+    def update_user_role(self, user_id: str, role: str) -> dict[str, Any]:
+        if role not in {"admin", "user", "guest"}:
+            raise ValueError("Invalid user role.")
+
+        users = self.load_users()
+        for user in users:
+            if user["id"] == user_id:
+                user["role"] = role
+                self.save_users(users)
+                return user
+        raise ValueError("User not found.")
+
+    def remove_user(self, user_id: str) -> dict[str, Any]:
+        users = self.load_users()
+        removed_user = None
+        remaining_users = []
+        for user in users:
+            if user["id"] == user_id:
+                removed_user = user
+            else:
+                remaining_users.append(user)
+
+        if removed_user is None:
+            raise ValueError("User not found.")
+
+        self.save_users(remaining_users)
+
+        sessions = self.load_sessions()
+        active_tokens = [
+            token for token, session in sessions.items()
+            if session["user_id"] == user_id
+        ]
+        for token in active_tokens:
+            sessions.pop(token, None)
+        self.save_sessions(sessions)
+        return removed_user
+
     def validate_registration_input(
         self,
         username: str,

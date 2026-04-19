@@ -9,6 +9,7 @@
 </section>
 
 <section class="panel grid two">
+  {% if g.current_user.role != 'guest' %}
   <article>
     <h3>Upload Document</h3>
     <form method="post" action="{{ url_for('documents') }}" enctype="multipart/form-data">
@@ -24,6 +25,12 @@
       <button type="submit">Upload</button>
     </form>
   </article>
+  {% else %}
+  <article>
+    <h3>Guest Access</h3>
+    <p class="muted">Guest accounts can still view and download existing documents, but they cannot upload, replace, or delete content.</p>
+  </article>
+  {% endif %}
 
   <article>
     <h3>My Documents</h3>
@@ -42,25 +49,30 @@
           <tr>
             <td>{{ doc.display_name }}</td>
             <td>{{ doc.version }}</td>
-            <td>{{ get_user_document_role(doc, g.current_user.id) }}</td>
+            <td>{{ effective_document_role(doc, g.current_user) }}</td>
             <td>
               <a href="{{ url_for('download', doc_id=doc.id) }}">Download</a>
+              {% if g.current_user.role != 'guest' %}
               <details>
                 <summary>Upload New Version</summary>
                 <form method="post" action="{{ url_for('update_existing_document', doc_id=doc.id) }}" enctype="multipart/form-data">
-                  <label for="owned-update-{{ doc.id }}">Choose replacement file</label>
-                  <input id="owned-update-{{ doc.id }}" name="document_file" type="file" required>
-                  <button type="submit">Replace File</button>
-                </form>
-                {% if doc.version_history %}
-                <p class="muted">Previous versions: {{ doc.version_history|length }}</p>
-                <ul>
+                <label for="owned-update-{{ doc.id }}">Choose replacement file</label>
+                <input id="owned-update-{{ doc.id }}" name="document_file" type="file" required>
+                <button type="submit">Replace File</button>
+              </form>
+              <form method="post" action="{{ url_for('delete_existing_document', doc_id=doc.id) }}">
+                <button type="submit">Delete Document</button>
+              </form>
+              {% if doc.version_history %}
+              <p class="muted">Previous versions: {{ doc.version_history|length }}</p>
+              <ul>
                   {% for old_version in doc.version_history|reverse %}
                   <li>Version {{ old_version.version }} - {{ old_version.display_name or old_version.filename }}</li>
                   {% endfor %}
                 </ul>
                 {% endif %}
               </details>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -91,7 +103,7 @@
         <tr>
           <td>{{ doc.display_name }}</td>
           <td>{{ doc.version }}</td>
-          <td>{{ get_user_document_role(doc, g.current_user.id) }}</td>
+          <td>{{ effective_document_role(doc, g.current_user) }}</td>
           <td>
             <a href="{{ url_for('download', doc_id=doc.id) }}">Download</a>
             {% if doc in editable_shared_documents %}
