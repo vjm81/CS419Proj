@@ -3,7 +3,7 @@ import uuid
 import time
 from pathlib import Path
 
-from flask import current_app
+from flask import current_app, has_request_context, request
 from werkzeug.utils import secure_filename
 
 from audit import log_event
@@ -47,6 +47,41 @@ def get_encrypted_storage():
     except RuntimeError:
         key_file = DEFAULT_KEY_FILE
     return EncryptedFileStorage(key_file)
+
+
+def get_upload_policy():
+    try:
+        return {
+            "allowed_extensions": set(current_app.config["ALLOWED_UPLOAD_EXTENSIONS"]),
+            "allowed_mime_types": set(current_app.config["ALLOWED_UPLOAD_MIME_TYPES"]),
+            "extension_mime_map": {
+                extension: set(mime_types)
+                for extension, mime_types in current_app.config["EXTENSION_MIME_MAP"].items()
+            },
+        }
+    except RuntimeError:
+        return {
+            "allowed_extensions": {"txt", "pdf", "doc", "docx", "csv", "png", "jpg", "jpeg"},
+            "allowed_mime_types": {
+                "text/plain",
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "text/csv",
+                "image/png",
+                "image/jpeg",
+            },
+            "extension_mime_map": {
+                "txt": {"text/plain"},
+                "pdf": {"application/pdf"},
+                "doc": {"application/msword"},
+                "docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+                "csv": {"text/csv"},
+                "png": {"image/png"},
+                "jpg": {"image/jpeg"},
+                "jpeg": {"image/jpeg"},
+            },
+        }
 
 def load_documents():
     data_file = get_documents_file()
@@ -300,6 +335,8 @@ def save_encrypted_upload(file):
     if not original_filename:
         raise ValueError("Invalid filename.")
 
+    validate_uploaded_file(file, original_filename)
+
     # The stored filename gets a UUID prefix so two users can upload files with the same visible name safely.
     stored_filename = f"{uuid.uuid4()}_{original_filename}"
     filepath = files_dir / stored_filename
@@ -307,6 +344,48 @@ def save_encrypted_upload(file):
     # To meet the data-at-rest requirement, I encrypt the uploaded bytes before writing them to disk.
     encrypted_storage.encrypt_to_file(filepath, file.read())
     return original_filename, stored_filename
+
+
+def validate_uploaded_file(file, original_filename):
+    policy = get_upload_policy()
+    extension = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else ""
+    content_type = (getattr(file, "content_type", "") or "").split(";", 1)[0].strip().lower()
+
+    if extension not in policy["allowed_extensions"]:
+        log_input_validation_failure(original_filename, "disallowed_extension", content_type)
+        raise ValueError("This file type is not allowed.")
+
+    if content_type not in policy["allowed_mime_types"]:
+        log_input_validation_failure(original_filename, "disallowed_mime_type", content_type)
+        raise ValueError("This upload MIME type is not allowed.")
+
+    expected_mime_types = policy["extension_mime_map"].get(extension, set())
+    if expected_mime_types and content_type not in expected_mime_types:
+        log_input_validation_failure(original_filename, "mime_extension_mismatch", content_type)
+        raise ValueError("The file extension does not match the detected upload type.")
+
+
+def log_input_validation_failure(filename, reason, content_type):
+    log_event("INPUT_VALIDATION_FAILED", None, filename=filename)
+    try:
+        current_app.logger.warning(
+            json.dumps(
+                {
+                    "event_type": "INPUT_VALIDATION_FAILED",
+                    "user_id": None,
+                    "ip_address": request.remote_addr if has_request_context() else "unknown",
+                    "user_agent": request.headers.get("User-Agent") if has_request_context() else "unknown",
+                    "details": {
+                        "filename": filename,
+                        "reason": reason,
+                        "content_type": content_type,
+                    },
+                    "severity": "WARNING",
+                }
+            )
+        )
+    except RuntimeError:
+        pass
 
 
 def update_document(doc_id, user_id, file):

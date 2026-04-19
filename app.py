@@ -50,6 +50,7 @@ def ensure_project_files(app: Flask) -> None:
     default_json_files = {
         data_dir / "users.json": [],
         data_dir / "sessions.json": {},
+        data_dir / "login_attempts.json": {},
         data_dir / "documents.json": {},
         data_dir / "shares.json": [],
         data_dir / "audit_trail.json": [],
@@ -72,9 +73,22 @@ def configure_logging(app: Flask) -> None:
         logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     )
 
-    if not app.logger.handlers:
+    existing_file_handler = any(
+        isinstance(handler, logging.FileHandler)
+        and Path(getattr(handler, "baseFilename", "")) == security_log
+        for handler in app.logger.handlers
+    )
+    if not existing_file_handler:
         app.logger.addHandler(file_handler)
     app.logger.setLevel(logging.INFO)
+
+
+def resolve_ssl_context(app: Flask):
+    cert_file = Path(app.config["TLS_CERT_FILE"])
+    key_file = Path(app.config["TLS_KEY_FILE"])
+    if cert_file.exists() and key_file.exists():
+        return (str(cert_file), str(key_file))
+    return None
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
@@ -87,8 +101,20 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     auth_manager = AuthManager(
         users_file=Path(app.config["DATA_DIR"]) / "users.json",
         sessions_file=Path(app.config["DATA_DIR"]) / "sessions.json",
+        login_attempts_file=Path(app.config["DATA_DIR"]) / "login_attempts.json",
         security_log_file=Path(app.config["LOG_DIR"]) / "security.log",
         session_timeout=app.config["SESSION_TIMEOUT"],
+    )
+    auth_manager.log_event(
+        "SECURITY_CONFIGURATION",
+        None,
+        {
+            "force_https": app.config.get("FORCE_HTTPS", False),
+            "session_cookie_secure": app.config["SESSION_COOKIE_SECURE"],
+            "tls_configured": bool(resolve_ssl_context(app)),
+        },
+        "system",
+        "startup",
     )
 
     def get_all_users():
@@ -179,6 +205,17 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         session_data = auth_manager.validate_session(token, client_ip(), client_agent())
         g.session = session_data
         g.current_user = auth_manager.get_user_by_id(session_data["user_id"]) if session_data else None
+
+    @app.before_request
+    def require_https():
+        if (
+            app.config.get("FORCE_HTTPS")
+            and not request.is_secure
+            and not app.debug
+            and not app.testing
+        ):
+            secure_url = request.url.replace("http://", "https://", 1)
+            return redirect(secure_url, code=301)
 
     @app.after_request
     def set_security_headers(response):
@@ -552,4 +589,9 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    app.run(host=app.config["APP_HOST"], port=app.config["APP_PORT"], debug=True)
+    app.run(
+        host=app.config["APP_HOST"],
+        port=app.config["APP_PORT"],
+        debug=app.config.get("DEBUG", False),
+        ssl_context=resolve_ssl_context(app),
+    )

@@ -29,17 +29,23 @@ class AuthManager:
         self,
         users_file: Path,
         sessions_file: Path,
+        login_attempts_file: Path,
         security_log_file: Path,
         session_timeout: int = 1800,
         lockout_threshold: int = 5,
         lockout_seconds: int = 900,
+        rate_limit_max_attempts: int = 10,
+        rate_limit_window_seconds: int = 60,
     ) -> None:
         self.users_file = Path(users_file)
         self.sessions_file = Path(sessions_file)
+        self.login_attempts_file = Path(login_attempts_file)
         self.security_log_file = Path(security_log_file)
         self.session_timeout = session_timeout
         self.lockout_threshold = lockout_threshold
         self.lockout_seconds = lockout_seconds
+        self.rate_limit_max_attempts = rate_limit_max_attempts
+        self.rate_limit_window_seconds = rate_limit_window_seconds
 
     def load_users(self) -> list[dict[str, Any]]:
         return self._read_json(self.users_file, [])
@@ -52,6 +58,13 @@ class AuthManager:
 
     def save_sessions(self, sessions: dict[str, dict[str, Any]]) -> None:
         self._write_json(self.sessions_file, sessions)
+
+    def load_login_attempts(self) -> dict[str, list[float]]:
+        attempts = self._read_json(self.login_attempts_file, {})
+        return attempts if isinstance(attempts, dict) else {}
+
+    def save_login_attempts(self, attempts: dict[str, list[float]]) -> None:
+        self._write_json(self.login_attempts_file, attempts)
 
     def register_user(
         self,
@@ -125,6 +138,18 @@ class AuthManager:
         user_agent: str,
     ) -> AuthResult:
         identifier = identifier.strip()
+        if self.is_rate_limited(ip_address):
+            self.log_event(
+                "LOGIN_RATE_LIMITED",
+                None,
+                {"identifier": identifier, "reason": "Too many attempts from IP"},
+                ip_address,
+                user_agent,
+                severity="WARNING",
+            )
+            return AuthResult(False, "Too many login attempts from this IP. Please wait a minute and try again.")
+
+        self.record_login_attempt(ip_address)
         users = self.load_users()
         user = self.find_user_by_identifier(identifier, users)
 
@@ -215,6 +240,14 @@ class AuthManager:
         sessions = self.load_sessions()
         session = sessions.get(token)
         if not session:
+            self.log_event(
+                "INVALID_SESSION_TOKEN",
+                None,
+                {"reason": "unknown_token", "token_prefix": token[:10]},
+                ip_address,
+                user_agent,
+                severity="WARNING",
+            )
             return None
 
         # I expire inactive sessions here so a session does not stay valid forever
@@ -315,6 +348,20 @@ class AuthManager:
         # Anything not explicitly allowed gets denied by default.
         return user.get("role") in allowed_roles
 
+    def is_rate_limited(self, ip_address: str) -> bool:
+        attempts = self.load_login_attempts()
+        recent_attempts = self._recent_attempts_for_ip(attempts, ip_address)
+        attempts[ip_address] = recent_attempts
+        self.save_login_attempts(attempts)
+        return len(recent_attempts) >= self.rate_limit_max_attempts
+
+    def record_login_attempt(self, ip_address: str) -> None:
+        attempts = self.load_login_attempts()
+        recent_attempts = self._recent_attempts_for_ip(attempts, ip_address)
+        recent_attempts.append(time.time())
+        attempts[ip_address] = recent_attempts
+        self.save_login_attempts(attempts)
+
     def log_event(
         self,
         event_type: str,
@@ -414,6 +461,18 @@ class AuthManager:
             if user["id"] == updated_user["id"]:
                 users[index] = updated_user
                 return
+
+    def _recent_attempts_for_ip(
+        self,
+        attempts: dict[str, list[float]],
+        ip_address: str,
+    ) -> list[float]:
+        cutoff = time.time() - self.rate_limit_window_seconds
+        return [
+            timestamp
+            for timestamp in attempts.get(ip_address, [])
+            if isinstance(timestamp, (int, float)) and timestamp >= cutoff
+        ]
 
     @staticmethod
     def _read_json(path: Path, default: Any) -> Any:

@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from io import BytesIO
 
-from app import create_app
+from app import create_app, resolve_ssl_context
 from config import Config
 
 
@@ -18,6 +18,22 @@ def build_test_app(tmp_path):
         SESSION_COOKIE_SECURE = False
 
     return create_app(TestConfig)
+
+
+def build_https_test_app(tmp_path):
+    class HttpsConfig(Config):
+        SECRET_KEY = "test-secret"
+        DATA_DIR = tmp_path / "data"
+        LOG_DIR = tmp_path / "logs"
+        UPLOAD_DIR = DATA_DIR / "uploads"
+        ENCRYPTED_DIR = DATA_DIR / "encrypted"
+        SESSION_TIMEOUT = 1800
+        SESSION_COOKIE_SECURE = True
+        DEBUG = False
+        TESTING = False
+        FORCE_HTTPS = True
+
+    return create_app(HttpsConfig)
 
 
 def register(client, username="test_user", email="test@example.com", password="StrongPass123!"):
@@ -44,15 +60,29 @@ def login(client, identifier="test_user", password="StrongPass123!"):
     )
 
 
-def upload_document(client, filename="notes.txt", contents=b"hello world"):
+def upload_document(
+    client,
+    filename="notes.txt",
+    contents=b"hello world",
+    content_type="text/plain",
+):
     return client.post(
         "/documents",
         data={
-            "document_file": (BytesIO(contents), filename),
+            "document_file": (BytesIO(contents), filename, content_type),
         },
         content_type="multipart/form-data",
         follow_redirects=False,
     )
+
+
+def read_security_log(tmp_path, app=None):
+    if app is not None:
+        for handler in app.logger.handlers:
+            flush = getattr(handler, "flush", None)
+            if callable(flush):
+                flush()
+    return (tmp_path / "logs" / "security.log").read_text(encoding="utf-8")
 
 
 def test_health_endpoint(tmp_path):
@@ -63,6 +93,39 @@ def test_health_endpoint(tmp_path):
 
     assert response.status_code == 200
     assert response.get_json()["status"] == "ok"
+
+
+def test_security_configuration_event_is_logged_on_startup(tmp_path):
+    app = build_test_app(tmp_path)
+
+    security_log = read_security_log(tmp_path, app)
+
+    assert "SECURITY_CONFIGURATION" in security_log
+
+
+def test_force_https_redirects_insecure_requests(tmp_path):
+    app = build_https_test_app(tmp_path)
+    client = app.test_client()
+
+    response = client.get("/", base_url="http://localhost", follow_redirects=False)
+
+    assert response.status_code == 301
+    assert response.headers["Location"].startswith("https://")
+
+
+def test_resolve_ssl_context_uses_existing_cert_and_key(tmp_path):
+    app = build_test_app(tmp_path)
+    cert_file = tmp_path / "cert.pem"
+    key_file = tmp_path / "key.pem"
+    cert_file.write_text("cert", encoding="utf-8")
+    key_file.write_text("key", encoding="utf-8")
+
+    app.config["TLS_CERT_FILE"] = cert_file
+    app.config["TLS_KEY_FILE"] = key_file
+
+    ssl_context = resolve_ssl_context(app)
+
+    assert ssl_context == (str(cert_file), str(key_file))
 
 
 def test_register_valid_user_saves_to_json(tmp_path):
@@ -156,6 +219,25 @@ def test_failed_login_locks_account_after_five_attempts(tmp_path):
     assert users[0]["locked_until"] is not None
 
 
+def test_login_rate_limit_blocks_eleventh_attempt_from_same_ip(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    for _ in range(10):
+        response = login(client, identifier="unknown_user", password="WrongPassword123!")
+        assert response.status_code == 400
+        assert b"Too many login attempts from this IP" not in response.data
+
+    blocked_response = login(client, identifier="unknown_user", password="WrongPassword123!")
+
+    assert blocked_response.status_code == 400
+    assert b"Too many login attempts from this IP" in blocked_response.data
+
+    login_attempts = json.loads((tmp_path / "data" / "login_attempts.json").read_text(encoding="utf-8"))
+    assert "127.0.0.1" in login_attempts
+    assert len(login_attempts["127.0.0.1"]) == 10
+
+
 def test_logout_removes_session(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
@@ -169,6 +251,18 @@ def test_logout_removes_session(tmp_path):
     assert logout_response.headers["Location"].endswith("/login")
     sessions = json.loads((tmp_path / "data" / "sessions.json").read_text(encoding="utf-8"))
     assert sessions == {}
+
+
+def test_invalid_session_token_is_logged(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.set_cookie("session_token", "fake-token-value")
+    response = client.get("/dashboard", follow_redirects=False)
+
+    assert response.status_code == 302
+    security_log = read_security_log(tmp_path, app)
+    assert "INVALID_SESSION_TOKEN" in security_log
 
 
 def test_guest_cannot_access_user_only_pages(tmp_path):
@@ -267,6 +361,45 @@ def test_document_upload_and_listing(tmp_path):
     stored_filename = next(iter(documents.values()))["stored_filename"]
     stored_bytes = (tmp_path / "data" / "encrypted" / stored_filename).read_bytes()
     assert b"hello world" not in stored_bytes
+
+
+def test_upload_rejects_disallowed_extension(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    register(client)
+    login(client)
+
+    response = upload_document(
+        client,
+        filename="payload.exe",
+        contents=b"bad file",
+        content_type="application/octet-stream",
+    )
+
+    assert response.status_code == 302
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    assert documents == {}
+    assert "INPUT_VALIDATION_FAILED" in read_security_log(tmp_path, app)
+
+
+def test_upload_rejects_mime_mismatch(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    register(client)
+    login(client)
+
+    response = upload_document(
+        client,
+        filename="notes.txt",
+        contents=b"pretend executable",
+        content_type="application/pdf",
+    )
+
+    assert response.status_code == 302
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    assert documents == {}
 
 
 def test_document_uses_entered_name_in_lists(tmp_path):

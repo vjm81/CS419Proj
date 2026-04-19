@@ -166,5 +166,149 @@
         "filename": "lc48795mb0kc1.jpeg",
         "timestamp": 1776550806.5781841,
         "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "USER_ROLE_UPDATED",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": null,
+        "filename": "user2 -> user",
+        "timestamp": 1776571931.448769,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "USER_ROLE_UPDATED",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": null,
+        "filename": "user2 -> guest",
+        "timestamp": 1776571939.555879,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "USER_REMOVED",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": null,
+        "filename": "user3",
+        "timestamp": 1776571994.9109588,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPLOAD",
+        "user_id": "9d74c0c84dda98d3",
+        "doc_id": "36203198-ded5-4b5d-be23-ef09b765ee0b",
+        "filename": "atmy.jpg",
+        "timestamp": 1776572116.6086838,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPLOAD",
+        "user_id": "9d74c0c84dda98d3",
+        "doc_id": "bd567f4c-829f-4b79-ac96-d526b19531c8",
+        "filename": "documents.exe.jpg",
+        "timestamp": 1776572174.9073467,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPLOAD",
+        "user_id": "9d74c0c84dda98d3",
+        "doc_id": "3b6e674b-b4cd-48f0-89dc-3ff80e3c94d0",
+        "filename": "application/pdf",
+        "timestamp": 1776572206.251035,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "INPUT_VALIDATION_FAILED",
+        "user_id": null,
+        "doc_id": null,
+        "filename": "Codex_Installer.exe",
+        "timestamp": 1776572266.1316776,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "ACCESS_DENIED",
+        "user_id": "9d74c0c84dda98d3",
+        "doc_id": "66445f99-a206-4ad5-89ff-d09a2160df7a",
+        "filename": null,
+        "timestamp": 1776572346.7212892,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_SHARED",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "36203198-ded5-4b5d-be23-ef09b765ee0b",
+        "filename": "atmy.jpg",
+        "timestamp": 1776572393.6567743,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "USER_ROLE_UPDATED",
+        "user_id": "a3284784b5dd7522",
+        "doc_id": null,
+        "filename": "user2 -> user",
+        "timestamp": 1776572398.9256618,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPDATED",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "36203198-ded5-4b5d-be23-ef09b765ee0b",
+        "filename": "lc48795mb0kc1_1.jpeg",
+        "timestamp": 1776572419.976666,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "36203198-ded5-4b5d-be23-ef09b765ee0b",
+        "filename": "lc48795mb0kc1_1.jpeg",
+        "timestamp": 1776572423.384568,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "9d74c0c84dda98d3",
+        "doc_id": "36203198-ded5-4b5d-be23-ef09b765ee0b",
+        "filename": "lc48795mb0kc1_1.jpeg",
+        "timestamp": 1776572440.2532482,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_UPLOAD",
+        "user_id": "9d74c0c84dda98d3",
+        "doc_id": "3527c20e-9396-48c4-b9eb-8d4513dff1d3",
+        "filename": "New Image",
+        "timestamp": 1776574002.332672,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "9d74c0c84dda98d3",
+        "doc_id": "3527c20e-9396-48c4-b9eb-8d4513dff1d3",
+        "filename": "images_1.jpg",
+        "timestamp": 1776574009.541441,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_SHARED",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "3527c20e-9396-48c4-b9eb-8d4513dff1d3",
+        "filename": "images_1.jpg",
+        "timestamp": 1776574022.5367324,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "3527c20e-9396-48c4-b9eb-8d4513dff1d3",
+        "filename": "images_1.jpg",
+        "timestamp": 1776574063.8519776,
+        "ip_address": "127.0.0.1"
+    },
+    {
+        "event": "FILE_DOWNLOAD",
+        "user_id": "4782c42f88401bfa",
+        "doc_id": "3527c20e-9396-48c4-b9eb-8d4513dff1d3",
+        "filename": "images_1.jpg",
+        "timestamp": 1776574099.4012787,
+        "ip_address": "127.0.0.1"
     }
 ]

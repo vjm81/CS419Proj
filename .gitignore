@@ -10,6 +10,7 @@ secret.key
 *.pem
 *.log
 logs/
+data/login_attempts.json
 data/encrypted/
 files/
 .vscode/

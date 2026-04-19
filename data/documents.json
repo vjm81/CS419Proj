@@ -74,5 +74,75 @@
         "version": 1,
         "version_history": [],
         "is_deleted": true
+    },
+    "36203198-ded5-4b5d-be23-ef09b765ee0b": {
+        "id": "36203198-ded5-4b5d-be23-ef09b765ee0b",
+        "display_name": "atmy.jpg",
+        "filename": "lc48795mb0kc1_1.jpeg",
+        "stored_filename": "e94e7632-68b1-473f-871b-720cf8e61cc4_lc48795mb0kc1_1.jpeg",
+        "owner_id": "9d74c0c84dda98d3",
+        "shared_with": [
+            {
+                "user_id": "4782c42f88401bfa",
+                "role": "editor"
+            }
+        ],
+        "created_at": 1776572116.6086838,
+        "updated_at": 1776572419.974665,
+        "version": 2,
+        "version_history": [
+            {
+                "version": 1,
+                "display_name": "atmy.jpg",
+                "filename": "atmy.jpg",
+                "stored_filename": "0efd5dbf-f95e-4b85-a5bf-8f666519aa8d_atmy.jpg",
+                "updated_at": 1776572393.6517746
+            }
+        ],
+        "is_deleted": false
+    },
+    "bd567f4c-829f-4b79-ac96-d526b19531c8": {
+        "id": "bd567f4c-829f-4b79-ac96-d526b19531c8",
+        "display_name": "documents.exe.jpg",
+        "filename": "documents.exe.jpg",
+        "stored_filename": "45d1033b-e137-4fa2-9dd3-62e73720f011_documents.exe.jpg",
+        "owner_id": "9d74c0c84dda98d3",
+        "shared_with": [],
+        "created_at": 1776572174.9038103,
+        "updated_at": 1776572174.9038103,
+        "version": 1,
+        "version_history": [],
+        "is_deleted": false
+    },
+    "3b6e674b-b4cd-48f0-89dc-3ff80e3c94d0": {
+        "id": "3b6e674b-b4cd-48f0-89dc-3ff80e3c94d0",
+        "display_name": "application/pdf",
+        "filename": "atmy.jpg",
+        "stored_filename": "7f114f6c-b94f-4a51-ba06-6ce7dde5fd0a_atmy.jpg",
+        "owner_id": "9d74c0c84dda98d3",
+        "shared_with": [],
+        "created_at": 1776572206.2460341,
+        "updated_at": 1776572206.2460341,
+        "version": 1,
+        "version_history": [],
+        "is_deleted": false
+    },
+    "3527c20e-9396-48c4-b9eb-8d4513dff1d3": {
+        "id": "3527c20e-9396-48c4-b9eb-8d4513dff1d3",
+        "display_name": "New Image",
+        "filename": "images_1.jpg",
+        "stored_filename": "485d2fe9-5239-4b71-aaca-8187303201d9_images_1.jpg",
+        "owner_id": "9d74c0c84dda98d3",
+        "shared_with": [
+            {
+                "user_id": "4782c42f88401bfa",
+                "role": "viewer"
+            }
+        ],
+        "created_at": 1776574002.332672,
+        "updated_at": 1776574022.5307326,
+        "version": 1,
+        "version_history": [],
+        "is_deleted": false
     }
 }
