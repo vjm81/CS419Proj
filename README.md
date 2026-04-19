@@ -89,6 +89,50 @@ Optional environment variables:
 
 See [.env.example](C:/Users/Owner/Documents/codes/CS419Proj/.env.example) for sample values.
 
+### HTTPS Setup
+
+If you want to run the app over HTTPS locally, create a development certificate and key in the project root:
+
+- `cert.pem`
+- `key.pem`
+
+The current project already supports loading those files automatically through [app.py](C:/Users/Owner/Documents/codes/CS419Proj/app.py).
+
+### Generate Cert Files
+
+Option 1: Use the existing local files if they are already present.
+
+Option 2: Generate a self-signed certificate with Python and `cryptography`:
+
+```powershell
+python -c "from pathlib import Path; from datetime import datetime, timedelta, timezone; import ipaddress; from cryptography import x509; from cryptography.x509.oid import NameOID; from cryptography.hazmat.primitives import hashes, serialization; from cryptography.hazmat.primitives.asymmetric import rsa; base=Path('.'); key_path=base/'key.pem'; cert_path=base/'cert.pem'; key=rsa.generate_private_key(public_exponent=65537,key_size=2048); subject=issuer=x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME,'US'),x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME,'New York'),x509.NameAttribute(NameOID.LOCALITY_NAME,'Local Development'),x509.NameAttribute(NameOID.ORGANIZATION_NAME,'CS419 Project'),x509.NameAttribute(NameOID.COMMON_NAME,'localhost')]); cert=(x509.CertificateBuilder().subject_name(subject).issuer_name(issuer).public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(datetime.now(timezone.utc)-timedelta(minutes=5)).not_valid_after(datetime.now(timezone.utc)+timedelta(days=365)).add_extension(x509.SubjectAlternativeName([x509.DNSName('localhost'),x509.IPAddress(ipaddress.ip_address('127.0.0.1'))]),critical=False).add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True).sign(key, hashes.SHA256())); key_path.write_bytes(key.private_bytes(encoding=serialization.Encoding.PEM, format=serialization.PrivateFormat.TraditionalOpenSSL, encryption_algorithm=serialization.NoEncryption())); cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))"
+```
+
+### Run Over HTTPS
+
+Once `cert.pem` and `key.pem` exist, start the app normally:
+
+```powershell
+python app.py
+```
+
+Then open one of these in your browser:
+
+- `https://127.0.0.1:5000`
+- `https://localhost:5000`
+
+Because this is a self-signed development certificate, your browser will likely show a warning page first. That is expected for local testing.
+
+### Optional HTTPS Redirect Setting
+
+To enable the app's redirect logic outside development-style runs, set this in your local `.env`:
+
+```env
+FORCE_HTTPS=1
+```
+
+Then restart the app.
+
 ## Testing
 
 Run the automated test suite:
