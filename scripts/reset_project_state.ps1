@@ -1,6 +1,10 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+#This script exists for the sole purpose of resetting the project runtime state to a known baseline, 
+#which is useful for testing and development. It should be used with caution, as it will delete data and logs.
+#It will clean out the json files in the data directory, clear out the encrypted and uploads directories, and reset the log files.
+
 function Assert-InProjectRoot {
     param (
         [Parameter(Mandatory = $true)]

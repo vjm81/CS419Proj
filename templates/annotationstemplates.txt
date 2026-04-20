@@ -1,0 +1,13 @@
+This directory contains the html files for the site.
+Instead of individually commenting the same thing over and over again,
+This txt file serves as one annotation.
+All the files encompass the GUI for the site including:
+Dashboard
+Audit log
+Documents
+Login page
+Register page
+Sharing
+Admin
+
+All the files have the buttons, text boxes, panels etc that make up the basics.
