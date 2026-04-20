@@ -32,6 +32,20 @@ from documents import (
     update_document,
 )
 
+#This file contains the main Flask application factory and route definitions for the secure document 
+#sharing system. It sets up the application configuration, initializes necessary directories and files,
+#configures logging, and defines routes for user authentication, document management, sharing, and audit 
+#viewing. The application uses an AuthManager class to handle user authentication and session management, 
+#and includes decorators to enforce login and role-based access control on protected routes. The routes 
+#handle actions like uploading documents (with encryption), downloading (with decryption), 
+#sharing documents with specific roles, and viewing audit logs of user activity. Security best 
+#practices are applied in handling file uploads, managing sessions, and setting HTTP security headers.
+
+
+#This function ensures that all necessary directories and files for the application to run are created 
+#if they do not already exist. It creates the data directory, log directory, upload and encrypted 
+#subdirectories, and initializes default JSON files for users, sessions, login attempts, documents, 
+#shares, and audit trail.
 def ensure_project_files(app: Flask) -> None:
     data_dir = Path(app.config["DATA_DIR"])
     log_dir = Path(app.config["LOG_DIR"])
@@ -64,7 +78,10 @@ def ensure_project_files(app: Flask) -> None:
         log_path = log_dir / log_name
         log_path.touch(exist_ok=True)
 
-
+#This function configures logging for the Flask application, specifically setting up a file handler 
+#for security-related logs. It creates a FileHandler that writes to a security.log file in the 
+#configured log directory, with a specific log format. The function checks if a handler for that log 
+#file already exists to avoid adding duplicate handlers, and sets the logging level to INFO.
 def configure_logging(app: Flask) -> None:
     security_log = Path(app.config["LOG_DIR"]) / "security.log"
 
@@ -82,7 +99,11 @@ def configure_logging(app: Flask) -> None:
         app.logger.addHandler(file_handler)
     app.logger.setLevel(logging.INFO)
 
-
+#This function checks if TLS certificate and key files are configured and exist, and if so, returns 
+#a tuple of their paths to be used as the SSL context for the Flask application. If either file is 
+#missing, it returns None, indicating that the application should run without SSL. This allows the
+#application to support both secure (HTTPS) and non-secure (HTTP) modes based on configuration and
+#available files.
 def resolve_ssl_context(app: Flask):
     cert_file = Path(app.config["TLS_CERT_FILE"])
     key_file = Path(app.config["TLS_KEY_FILE"])
@@ -90,7 +111,13 @@ def resolve_ssl_context(app: Flask):
         return (str(cert_file), str(key_file))
     return None
 
-
+#This function is the main application factory for the Flask app. It takes an optional configuration 
+#class, and sets up the Flask application with that configuration. It ensures necessary files and 
+#directories are created. It initializes an AuthManager for handling authentication and session 
+#management, and defines helper functions for user and document management. It also defines route
+#handlers for various endpoints like downloading documents, user authentication 
+#(login, register, logout), dashboard, document management (upload, update, delete), 
+#sharing management, audit viewing, and admin panel.
 def create_app(config_class: type[Config] = Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -116,13 +143,21 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         "system",
         "startup",
     )
-
+    #This is a helper function to retrieve all users from the authentication manager, 
+    #which can be used in various parts of the application to display user information or
+    #perform user-related operations.
     def get_all_users():
         return auth_manager.load_users()
-
+    
+    #This is a helper function to find a user by their username using the authentication manager,
+    #which can be used in routes that need to look up users based on their username, such as when sharing
+    #documents with other users.
     def find_user_by_username(username: str):
         return auth_manager.find_user_by_username(username)
-
+    
+    #This is a helper function to retrieve all documents that a specific user has access to, 
+    #including both documents they own and documents shared with them. It can be used in
+    #routes that need to display a user's documents or check access permissions.
     def summarize_documents_for_user(user_id: str):
         owned = get_owned_documents(user_id)
         shared = get_documents_shared_with_user(user_id)
@@ -130,7 +165,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         if not g.current_user or g.current_user["role"] != "guest":
             editable_shared = [doc for doc in shared if can_edit_document(doc, user_id)]
         return owned, shared, editable_shared
-
+    
+    #This is a helper function to retrieve all documents in the system, 
+    #including deleted ones, which can be used in the admin panel to provide an
+    #overview of all documents and their statuses.
     def get_visible_audit_entries_for_user(user_id: str):
         audit_entries = enrich_audit_entries(get_recent_audit())
         if g.current_user["role"] == "admin":
@@ -145,7 +183,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             or entry.get("affected_user_id") == user_id
             or entry.get("doc_id") in visible_doc_ids
         ]
-
+    
+    #This is a helper function to enrich audit log entries with additional information
+    #such as usernames and formatted timestamps, which can be used to make the audit log more
+    #readable and informative in the UI.
     def enrich_audit_entries(entries):
         users_by_id = {user["id"]: user["username"] for user in get_all_users()}
         return [
@@ -166,7 +207,12 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             }
             for entry in entries
         ]
-
+    
+    #This is a helper function to determine the effective role a user has for a specific document, 
+    #taking into account both the user's system role and their document-specific role. 
+    #For example, if a user has a "guest" system role but is assigned an "editor" role for a
+    #document, this function will  return "viewer" to reflect that guests should not have 
+    #editing capabilities even if the document metadata says otherwise.
     def effective_document_role(doc, user):
         if not user:
             return None
@@ -177,16 +223,25 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             # editor we present it like viewer access in the UI.
             return "viewer"
         return role
-
+    
+    #This is a helper function to retrieve the client's IP address from the request, 
+    #which can be used for logging and security purposes, such as in the audit log or 
+    #when validating sessions.
     def client_ip() -> str:
         return request.remote_addr or "unknown"
 
+    #This is a helper function to retrieve the client's user agent string from the request headers,
+    #which can be used for logging and security purposes, such as in the audit log or when validating
+    #sessions.
     def client_agent() -> str:
         return request.headers.get("User-Agent", "unknown")
-
+    
+    #This is a helper function to retrieve the current session token from the request cookies,
+    #which can be used for validating the user's session and retrieving session data.
     def current_session_token() -> str | None:
         return request.cookies.get("session_token")
 
+    #This is a decorator function to enforce that a user must be logged in to access certain routes.
     def login_required(view):
         @wraps(view)
         def wrapped_view(*args, **kwargs):
@@ -197,6 +252,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
         return wrapped_view
 
+    #This is a decorator function to enforce that a user must have one of the specified roles to 
+    #access certain routes.
     def role_required(*allowed_roles: str):
         def decorator(view):
             @wraps(view)
@@ -220,6 +277,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
         return decorator
 
+    #This function is registered to run before each request, and it loads the user's session based on 
+    # the session token cookie. It validates the session token against the stored sessions, checks the 
+    #client's IP and user agent for additional security, and sets the current user information in the 
+    #Flask global context (g) for use in route handlers.
     @app.before_request
     def load_user_session() -> None:
         token = current_session_token()
@@ -231,6 +292,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         g.session = session_data
         g.current_user = auth_manager.get_user_by_id(session_data["user_id"]) if session_data else None
 
+    #This function is registered to run before each request, and it enforces HTTPS by redirecting any
+    #non-secure requests to the secure version of the URL if the application is configured to force HTTPS.
     @app.before_request
     def require_https():
         if (
@@ -242,6 +305,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             secure_url = request.url.replace("http://", "https://", 1)
             return redirect(secure_url, code=301)
 
+    #This function is registered to run after each request, and it sets various HTTP security 
+    #headers on the response to help protect against common web vulnerabilities such as XSS, 
+    #clickjacking, and content sniffing.
     @app.after_request
     def set_security_headers(response):
         # I set security headers here to make the browser handle the site more safely,
@@ -266,6 +332,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             )
         return response
 
+    #This route handler allows a logged-in user to download a document by its ID. 
+    #It checks if the document exists and is not deleted, verifies that the user has access 
+    #to the document, logs the download event, and then sends the decrypted file as a response 
+    #with appropriate headers for downloading.
     @app.get("/download/<doc_id>")
     @login_required
     def download(doc_id):
@@ -287,10 +357,15 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             download_name=doc["filename"],
         )
 
+    #The following route handlers and functions are defined for user authentication 
+    #(login, register, logout), dashboard, document management (upload, update, delete), 
+    #sharing management, audit viewing, and admin panel, with appropriate access controls 
+    #and logging for security and audit purposes.
     @app.get("/")
     def index():
         return render_template("index.html")
 
+    #see above for login route handler with detailed comments
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if request.method == "POST":
@@ -319,7 +394,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             return response
 
         return render_template("login.html")
-
+    #see above for login route handler with detailed comments
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if request.method == "POST":
@@ -339,7 +414,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             return redirect(url_for("login"))
 
         return render_template("register.html")
-
+    #see above for login route handler with detailed comments
     @app.post("/logout")
     def logout():
         auth_manager.logout_session(current_session_token(), client_ip(), client_agent())
@@ -347,7 +422,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         response.delete_cookie("session_token")
         flash("Logged out successfully.", "success")
         return response
-
+    #see above for login route handler with detailed comments
     @app.get("/dashboard")
     @login_required
     @role_required("admin", "user", "guest")
@@ -365,6 +440,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             effective_document_role=effective_document_role,
         )
 
+    #This function is registered to run before each request, and it enforces HTTPS by redirecting any
+    #non-secure requests to the secure version of the URL if the application is configured to force HTTPS.
     @app.route("/documents", methods=["GET", "POST"])
     @login_required
     @role_required("admin", "user", "guest")
@@ -405,6 +482,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             effective_document_role=effective_document_role,
         )
 
+    #This route handler allows a logged-in user with the appropriate role to upload a new version of an existing document.
+    #It checks if the document exists, verifies that the user has edit access to the document
+    #and that a file is uploaded, then it updates the document with the new file and logs the update event.
     @app.post("/documents/<doc_id>/update")
     @login_required
     @role_required("admin", "user")
@@ -429,6 +509,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         )
         return redirect(url_for("documents"))
 
+    #This route handler allows a logged-in user with the appropriate role to delete an existing document.
+    #It checks if the document exists, verifies that the user has access to delete the document
+    #(either they are the owner or they are an admin), then it deletes the document and logs the 
+    #deletion event.
     @app.post("/documents/<doc_id>/delete")
     @login_required
     @role_required("admin", "user")
@@ -446,6 +530,11 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         flash(f"Deleted {deleted_doc['display_name']}.", "success")
         return redirect(url_for("documents"))
 
+    #This route handler allows a logged-in user with the appropriate role to share a document with 
+    #another user by specifying the target user's username and the role to assign. It checks that all 
+    #required fields are provided, verifies that the target user exists, and then shares the document 
+    #with the target user while logging the sharing event. It also handles errors such as missing fields,
+    #non-existent target users, and permission issues.
     @app.route("/sharing", methods=["GET", "POST"])
     @login_required
     @role_required("admin", "user")
@@ -504,6 +593,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             all_users=[user for user in get_all_users() if user["id"] != g.current_user["id"]],
         )
 
+    #This route handler allows a logged-in user with the appropriate role to remove sharing 
+    #access for a specific user on a document.
     @app.post("/sharing/remove")
     @login_required
     @role_required("admin", "user")
@@ -528,6 +619,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         flash("Removed document access successfully.", "success")
         return redirect(url_for("sharing"))
 
+    #This route handler allows a logged-in user with the appropriate role to view the audit log 
+    #of user activity. It retrieves the audit entries that are visible to the user based on their
+    #access to documents and their user role, summarizes the audit data for display, and renders 
+    #the audit log template with this information.
     @app.get("/audit")
     @login_required
     @role_required("admin", "user", "guest")
@@ -547,6 +642,11 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         }
         return render_template("audit.html", audit_entries=audit_entries, audit_summary=audit_summary)
 
+    #This route handler allows a logged-in user with the "admin" role to access the admin panel, 
+    #which provides an overview of all users, documents, and recent audit events. It retrieves all
+    #users and documents (including deleted ones), enriches recent audit entries with additional 
+    #information, summarizes key metrics for the admin dashboard, and renders the admin panel 
+    #template with this data.
     @app.get("/admin")
     @login_required
     @role_required("admin")
@@ -570,6 +670,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             user_lookup={user["id"]: user["username"] for user in all_users},
         )
 
+    #This route handler allows a logged-in user with the "admin" role to update the system role of 
+    #another user.
     @app.post("/admin/users/<user_id>/role")
     @login_required
     @role_required("admin")
@@ -589,6 +691,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         flash(f"Updated {updated_user['username']} to role {new_role}.", "success")
         return redirect(url_for("admin_panel"))
 
+    #This route handler allows a logged-in user with the "admin" role to delete another user's account. 
+    #It checks that the admin is not trying to delete their own account, then it removes the user 
+    #from the authentication manager, removes their access from all shared documents, logs the user
+    #removal event, and redirects back to the admin panel.
     @app.post("/admin/users/<user_id>/delete")
     @login_required
     @role_required("admin")
@@ -608,6 +714,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         flash(f"Removed user {removed_user['username']}.", "success")
         return redirect(url_for("admin_panel"))
 
+    #This route handler provides a simple health check endpoint that returns a JSON response
+    #indicating that the application is running and healthy. This can be used for monitoring
+    #and load balancer health checks.
     @app.get("/health")
     def health():
         return {"status": "ok", "app": "secure-document-sharing-system"}

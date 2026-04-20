@@ -17,7 +17,17 @@ USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]{3,20}$")
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PASSWORD_SPECIALS = set("!@#$%^&*")
 
+#This file contains the AuthManager class which handles user authentication, session management, 
+#and security logging. It provides methods for registering users, logging in and out, validating 
+#sessions, and enforcing role-based access control. The class uses JSON files to store user data, 
+#session information, login attempts, and security logs. It implements features such as password 
+#hashing with bcrypt, account lockout after repeated failed login attempts, rate limiting based 
+#on IP address, and detailed event logging for security auditing purposes. 
 
+
+
+#The AuthResult dataclass is used to standardize the results returned by authentication operations, 
+#including success status, messages, user data, and session tokens when applicable.
 @dataclass
 class AuthResult:
     ok: bool
@@ -25,7 +35,10 @@ class AuthResult:
     user: dict[str, Any] | None = None
     session_token: str | None = None
 
-
+#The AuthManager class provides methods for user registration, login, logout, session management, and
+#security event logging. It uses JSON files to store user information, active sessions, login attempts
+#for rate limiting, and security logs. The class includes features such as password hashing with bcrypt,
+#account lockout after repeated failed login attempts, and role-based access control for protected routes.
 class AuthManager:
     def __init__(
         self,
@@ -49,25 +62,45 @@ class AuthManager:
         self.rate_limit_max_attempts = rate_limit_max_attempts
         self.rate_limit_window_seconds = rate_limit_window_seconds
 
+    #The load_users method reads the user data from the specified JSON file and returns 
+    #it as a list of dictionaries.
     def load_users(self) -> list[dict[str, Any]]:
         return self._read_json(self.users_file, [])
 
+    #The save_users method takes a list of user dictionaries and writes it to the specified JSON file,
+    #overwriting any existing data.
     def save_users(self, users: list[dict[str, Any]]) -> None:
         self._write_json(self.users_file, users)
 
+    #The load_sessions method reads the active session data from the specified 
+    #JSON file and returns it as a dictionary mapping session tokens to session information.
     def load_sessions(self) -> dict[str, dict[str, Any]]:
         return self._read_json(self.sessions_file, {})
 
+    #The save_sessions method takes a dictionary of active sessions and writes it to the 
+    #specified JSON file, overwriting any existing session data.
     def save_sessions(self, sessions: dict[str, dict[str, Any]]) -> None:
         self._write_json(self.sessions_file, sessions)
 
+    #The load_login_attempts method reads the login attempt data from the specified JSON file and 
+    #returns it as a dictionary mapping IP addresses to lists of timestamps for recent login attempts.
+    #This is used for implementing rate limiting based on the number of login attempts from a given 
+    #IP address within a certain time window.
     def load_login_attempts(self) -> dict[str, list[float]]:
         attempts = self._read_json(self.login_attempts_file, {})
         return attempts if isinstance(attempts, dict) else {}
 
+    #The save_login_attempts method takes a dictionary of login attempts 
+    #(mapping IP addresses to lists of timestamps) and writes it to the specified JSON file, 
+    #overwriting any existing data. This is used to track login attempts for rate limiting purposes.
     def save_login_attempts(self, attempts: dict[str, list[float]]) -> None:
         self._write_json(self.login_attempts_file, attempts)
 
+    #The register_user method handles the registration of new users. It validates the 
+    #input fields, checks for existing usernames and emails, hashes the password using bcrypt,
+    #creates a new user record, saves it to the users file, and logs the registration event. 
+    #It returns an AuthResult indicating the success or failure of the registration process 
+    #along with an appropriate message and user data if successful.
     def register_user(
         self,
         username: str,
@@ -132,6 +165,12 @@ class AuthManager:
         )
         return AuthResult(True, "Registration successful. You can now log in.", user=user)
 
+    #The login_user method handles user login by validating the provided identifier 
+    #(username or email) and password. It checks for rate limiting based on the IP address, 
+    #verifies the password against the stored bcrypt hash, manages account lockout after repeated 
+    #failed attempts, creates a session token upon successful login, and logs all relevant events. 
+    #It returns an AuthResult indicating the success or failure of the login attempt along with an 
+    #appropriate message, user data, and session token if successful.
     def login_user(
         self,
         identifier: str,
@@ -198,6 +237,9 @@ class AuthManager:
         )
         return AuthResult(True, "Login successful.", user=user, session_token=token)
 
+    #The logout_session method invalidates a user's session token, effectively logging them out. 
+    #It removes the session from the active sessions file and logs the session destruction event
+    #along with the reason for logout.
     def logout_session(self, token: str | None, ip_address: str, user_agent: str) -> None:
         if not token:
             return
@@ -213,6 +255,10 @@ class AuthManager:
                 user_agent,
             )
 
+    #The create_session method generates a new session token for a user upon successful login, 
+    #stores the session information in the sessions file, and logs the session creation event. 
+    #The session information includes the user ID, creation time, last activity time, IP address,
+    #and user agent.
     def create_session(self, user_id: str, ip_address: str, user_agent: str) -> str:
         # To make sessions harder to guess, I use a long random token instead of something predictable.
         token = secrets.token_urlsafe(32)
@@ -235,12 +281,19 @@ class AuthManager:
         )
         return token
 
+    #The validate_session method checks if a given session token is valid and active. 
+    #It verifies that the token exists, has not expired due to inactivity, and optionally 
+    #updates the last activity timestamp to keep the session alive. It returns the session
+    #information if valid or None if the session is invalid or expired.
     def validate_session(self, token: str | None, ip_address: str, user_agent: str) -> dict[str, Any] | None:
         return self._validate_session(token, ip_address, user_agent, touch_activity=True)
 
+    #The get_session method is similar to validate_session but does not update the last activity timestamp.
     def get_session(self, token: str | None, ip_address: str, user_agent: str) -> dict[str, Any] | None:
         return self._validate_session(token, ip_address, user_agent, touch_activity=False)
 
+    #The _validate_session method is an internal helper that performs the actual validation 
+    #logic for session tokens.
     def _validate_session(
         self,
         token: str | None,
@@ -284,6 +337,8 @@ class AuthManager:
             self.save_sessions(sessions)
         return session
 
+    #The get_user_by_id method retrieves a user dictionary from the users file based on 
+    #the provided user ID.
     def get_user_by_id(self, user_id: str | None) -> dict[str, Any] | None:
         if not user_id:
             return None
@@ -292,6 +347,10 @@ class AuthManager:
                 return user
         return None
 
+    #The update_user_role method allows an administrator to change a user's role. It 
+    #checks that the new role is valid, updates the user's role in the users file, and
+    #returns the updated user dictionary. If the user is not found or the role is invalid,
+    #it raises a ValueError.
     def update_user_role(self, user_id: str, role: str) -> dict[str, Any]:
         if role not in {"admin", "user", "guest"}:
             raise ValueError("Invalid user role.")
@@ -304,6 +363,9 @@ class AuthManager:
                 return user
         raise ValueError("User not found.")
 
+    #The remove_user method allows an administrator to delete a user's account.
+    #It removes the user from the users file, invalidates any active sessions for that user, 
+    #and returns the removed user dictionary.
     def remove_user(self, user_id: str) -> dict[str, Any]:
         users = self.load_users()
         removed_user = None
@@ -329,6 +391,11 @@ class AuthManager:
         self.save_sessions(sessions)
         return removed_user
 
+    #The validate_registration_input method checks the validity of the registration input fields 
+    #such as username, email, password, and password confirmation. It ensures that the username 
+    #and email follow the specified patterns, that the password meets complexity requirements,
+    #and that the password confirmation matches. It returns an error message if any validation
+    #fails or None if all inputs are valid.
     def validate_registration_input(
         self,
         username: str,
@@ -356,6 +423,8 @@ class AuthManager:
             return "Password must include at least one special character: !@#$%^&*"
         return None
 
+    #The require_role method checks if a given user has one of the allowed roles for accessing 
+    #a protected route.
     def require_role(self, user: dict[str, Any] | None, allowed_roles: set[str]) -> bool:
         if not user:
             return False
@@ -363,6 +432,11 @@ class AuthManager:
         # Anything not explicitly allowed gets denied by default.
         return user.get("role") in allowed_roles
 
+    #The is_rate_limited method checks if the number of recent login attempts from a given IP address
+    #exceeds the configured threshold for rate limiting. It uses the login attempts data to determine
+    #how many attempts have been made from that IP address within the defined time window and returns True
+    #if the limit has been exceeded, or False otherwise. This helps to mitigate brute-force login attempts
+    #by temporarily blocking further attempts from the same IP address after too many failed logins.
     def is_rate_limited(self, ip_address: str) -> bool:
         attempts = self.load_login_attempts()
         recent_attempts = self._recent_attempts_for_ip(attempts, ip_address)
@@ -370,6 +444,10 @@ class AuthManager:
         self.save_login_attempts(attempts)
         return len(recent_attempts) >= self.rate_limit_max_attempts
 
+    #The record_login_attempt method records a login attempt for a given IP address by 
+    #appending the current timestamp to the list of attempts for that IP in the login attempts data. 
+    #This is used to track the number of login attempts from each IP address for implementing rate 
+    #limiting and blocking excessive login attempts that may indicate a brute-force attack.
     def record_login_attempt(self, ip_address: str) -> None:
         attempts = self.load_login_attempts()
         recent_attempts = self._recent_attempts_for_ip(attempts, ip_address)
@@ -377,6 +455,15 @@ class AuthManager:
         attempts[ip_address] = recent_attempts
         self.save_login_attempts(attempts)
 
+    #The log_event function is responsible for recording an event in the audit trail. It takes parameters
+    #such as the event type, user ID, document ID, filename, event details, and affected user ID. It loads
+    #the existing audit data, appends a new entry with the provided information along with the current
+    #timestamp and the IP address of the requester (if available), and then saves the updated audit data back
+    #to the file. This function is used throughout the application to log various user actions and
+    #system events. The logged information includes details such as the event type, user ID, document ID,
+    #filename, event details, affected user ID (if applicable), timestamp, and IP address.
+    #This allows for tracking user actions and monitoring system activity for security and accountability
+    #purposes.
     def log_event(
         self,
         event_type: str,
@@ -400,6 +487,10 @@ class AuthManager:
         with self.security_log_file.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry) + "\n")
 
+    #The find_user_by_identifier method searches for a user in the provided list of users 
+    #(or loads them if not provided) by matching the given identifier against both the username 
+    #and email fields. It returns the user dictionary if a match is found or None if no matching 
+    #user exists. This allows for flexible login using either username or email as the identifier.
     def find_user_by_identifier(
         self, identifier: str, users: list[dict[str, Any]] | None = None
     ) -> dict[str, Any] | None:
@@ -410,6 +501,11 @@ class AuthManager:
                 return user
         return None
 
+    #The find_user_by_username method searches for a user in the provided list of users 
+    #(or loads them if not provided) by matching the given username against the username 
+    #field of each user. It returns the user dictionary if a match is found or None if no 
+    #matching user exists. This is used to check for existing usernames during registration 
+    #and for login when the identifier is a username.
     def find_user_by_username(
         self, username: str, users: list[dict[str, Any]] | None = None
     ) -> dict[str, Any] | None:
@@ -419,6 +515,11 @@ class AuthManager:
                 return user
         return None
 
+    #The find_user_by_email method searches for a user in the provided list of users
+    #(or loads them if not provided) by matching the given email against the email field of each user.
+    #It returns the user dictionary if a match is found or None if no matching user exists
+    #This is used to check for existing emails during registration and for login when the identifier 
+    #is an email.
     def find_user_by_email(
         self, email: str, users: list[dict[str, Any]] | None = None
     ) -> dict[str, Any] | None:
@@ -428,10 +529,21 @@ class AuthManager:
                 return user
         return None
 
+    #The is_locked method checks if a user's account is currently locked due to too many failed 
+    #login attempts. It looks at the "locked_until" field of the user dictionary and compares
+    #it to the current time.
     def is_locked(self, user: dict[str, Any]) -> bool:
         locked_until = user.get("locked_until")
         return bool(locked_until and locked_until > time.time())
 
+    #The _record_failed_login method is called when a login attempt fails due to an incorrect password.
+    #It increments the failed_attempts count for the user, checks if the account should be
+    #locked based on the lockout threshold, updates the user record, saves it, and logs the failed login
+    #event. If the account gets locked, it also logs an account lockout event.
+    #This method helps to enforce account lockout policies after repeated failed login attempts,
+    #making it harder for attackers to guess passwords through brute-force methods by temporarily
+    #locking the account after a certain number of failed attempts and logging all relevant events
+    #for security monitoring.
     def _record_failed_login(
         self,
         user: dict[str, Any],
@@ -471,12 +583,23 @@ class AuthManager:
         )
         return AuthResult(False, message)
 
+    #The _upsert_user method is an internal helper that updates an existing user record in the 
+    #list of users or adds it if it does not already exist. It searches for a user with the 
+    #same ID and replaces the record with the updated user data. This is used to save changes
+    # to a user's failed login attempts, lockout status, role changes, and other updates to 
+    #the user record in the users file.
     def _upsert_user(self, users: list[dict[str, Any]], updated_user: dict[str, Any]) -> None:
         for index, user in enumerate(users):
             if user["id"] == updated_user["id"]:
                 users[index] = updated_user
                 return
 
+    #The _recent_attempts_for_ip method filters the list of login attempt timestamps for a 
+    #given IP address to include only those that fall within the defined rate limit window. 
+    #It calculates a cutoff time based on the current time minus the rate limit window duration 
+    #and returns a list of timestamps that are greater than or equal to this cutoff. 
+    #This is used to determine how many recent login attempts have been made from that
+    #IP address for enforcing rate limiting.
     def _recent_attempts_for_ip(
         self,
         attempts: dict[str, list[float]],
@@ -489,6 +612,12 @@ class AuthManager:
             if isinstance(timestamp, (int, float)) and timestamp >= cutoff
         ]
 
+    #The _read_json method is a static helper function that reads JSON data from a specified file path.
+    #If the file does not exist or is empty, it returns a provided default value.
+    # If the file contains invalid JSON, it creates a backup of the corrupted file with a ".corrupt" 
+    #suffix and returns the default value. This method is used to safely read user data, session 
+    #information, login attempts, and other JSON-based data while handling potential issues with 
+    #file corruption or missing files gracefully.
     @staticmethod
     def _read_json(path: Path, default: Any) -> Any:
         if not path.exists():
@@ -505,6 +634,10 @@ class AuthManager:
             backup_path.write_text(raw, encoding="utf-8")
             return default
 
+    #The _write_json method is a static helper function that writes JSON data to a specified file path.
+    #It ensures that the parent directory exists, writes the JSON data to a temporary file, and then
+    #atomically replaces the target file with the temporary file. This approach helps to prevent data
+    #corruption by ensuring that the file is only replaced if the write operation completes successfully.
     @staticmethod
     def _write_json(path: Path, payload: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

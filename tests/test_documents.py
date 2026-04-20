@@ -6,7 +6,21 @@ from app import create_app
 from config import Config
 from documents import create_document, get_decrypted_file_bytes, get_document, get_file_path
 
+#This file contains tests for the document management functionality of the application, specifically 
+#focusing on the encryption and decryption of uploaded files. The test verifies that when a document is
+#created by uploading a file, the file is stored in an encrypted format, and that the original content 
+#can be correctly retrieved by decrypting the stored file. It simulates a file upload using a BytesIO 
+#stream, creates a document with that file, and then checks that the stored file does not contain the 
+#original plaintext content while confirming that the decrypted bytes match the original input. 
+#This ensures that the encryption mechanism is working as intended while preserving data integrity for
+#retrieval.
 
+
+#This test verifies that when a document is created by uploading a file, the file is stored in an 
+#encrypted format. It simulates a file upload using a BytesIO stream, creates a document with that 
+#file, and then checks that the stored file does not contain the original plaintext content. 
+#This ensures that the encryption mechanism is working as intended and that sensitive information
+#is not stored in plaintext on the server.
 def build_test_app(tmp_path):
     class TestConfig(Config):
         SECRET_KEY = "test-secret"
@@ -21,7 +35,12 @@ def build_test_app(tmp_path):
 
     return create_app(TestConfig)
 
-
+#This test verifies that when a document is created by uploading a file, the file is stored in an 
+#encrypted format, and that the original content can be correctly retrieved by decrypting the stored
+#file. It simulates a file upload using a BytesIO stream, creates a document with that file, and then 
+#checks that the stored file does not contain the original plaintext content while confirming that the 
+#decrypted bytes match the original input. This ensures that the encryption mechanism is working as 
+#intended while preserving data integrity for retrieval.
 def test_create_document_encrypts_file_and_preserves_decryption(tmp_path):
     app = build_test_app(tmp_path)
 
