@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import secrets
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -234,6 +236,18 @@ class AuthManager:
         return token
 
     def validate_session(self, token: str | None, ip_address: str, user_agent: str) -> dict[str, Any] | None:
+        return self._validate_session(token, ip_address, user_agent, touch_activity=True)
+
+    def get_session(self, token: str | None, ip_address: str, user_agent: str) -> dict[str, Any] | None:
+        return self._validate_session(token, ip_address, user_agent, touch_activity=False)
+
+    def _validate_session(
+        self,
+        token: str | None,
+        ip_address: str,
+        user_agent: str,
+        touch_activity: bool,
+    ) -> dict[str, Any] | None:
         if not token:
             return None
 
@@ -264,9 +278,10 @@ class AuthManager:
             )
             return None
 
-        session["last_activity"] = time.time()
-        sessions[token] = session
-        self.save_sessions(sessions)
+        if touch_activity:
+            session["last_activity"] = time.time()
+            sessions[token] = session
+            self.save_sessions(sessions)
         return session
 
     def get_user_by_id(self, user_id: str | None) -> dict[str, Any] | None:
@@ -478,11 +493,34 @@ class AuthManager:
     def _read_json(path: Path, default: Any) -> Any:
         if not path.exists():
             return default
-        raw = path.read_text(encoding="utf-8").strip()
+        raw = path.read_text(encoding="utf-8-sig").strip()
         if not raw:
             return default
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            # Runtime JSON files can get corrupted if the app closes mid-write.
+            # Falling back here keeps one bad state file from crashing the whole site.
+            backup_path = path.with_suffix(path.suffix + ".corrupt")
+            backup_path.write_text(raw, encoding="utf-8")
+            return default
 
     @staticmethod
     def _write_json(path: Path, payload: Any) -> None:
-        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            delete=False,
+        ) as handle:
+            json.dump(payload, handle, indent=2)
+            temp_name = handle.name
+        for _ in range(3):
+            try:
+                os.replace(temp_name, path)
+                return
+            except PermissionError:
+                time.sleep(0.05)
+        Path(temp_name).unlink(missing_ok=True)
+        raise

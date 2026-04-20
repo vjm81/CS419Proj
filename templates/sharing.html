@@ -24,12 +24,7 @@
       </select>
 
       <label for="share_user">Share With User</label>
-      <input id="share_user" name="share_user" type="text" list="shareable-users">
-      <datalist id="shareable-users">
-        {% for user in all_users %}
-        <option value="{{ user.username }}"></option>
-        {% endfor %}
-      </datalist>
+      <input id="share_user" name="share_user" type="text" autocomplete="off" placeholder="Enter username, for example user1">
 
       <label for="share_role">Permission</label>
       <select id="share_role" name="share_role">
@@ -42,9 +37,20 @@
   </article>
 
   <article>
-    <h3>Current Shares</h3>
+    <h3>Sharing Summary</h3>
     <p class="muted">Owned documents available to share: {{ owned_documents|length }}</p>
-    <table>
+    <p class="muted">Active share entries: {{ current_shares|length }}</p>
+    {% if owned_documents %}
+    <p class="muted">Choose a document you own, type the other user's username, and assign either viewer or editor access.</p>
+    {% else %}
+    <p class="muted">Upload a document first before sharing it with other users.</p>
+    {% endif %}
+  </article>
+</section>
+
+<section class="panel">
+  <h3>Current Shares</h3>
+  <table>
       <thead>
         <tr>
           <th>Document</th>
@@ -58,7 +64,7 @@
         {% if current_shares %}
           {% for share in current_shares %}
           <tr>
-            <td>{{ share.filename }}</td>
+            <td>{{ share.display_name or share.filename }}</td>
             <td>{{ share.version }}</td>
             <td>{{ share.target_username }}</td>
             <td>
@@ -87,7 +93,6 @@
           </tr>
         {% endif %}
       </tbody>
-    </table>
-  </article>
+  </table>
 </section>
 {% endblock %}

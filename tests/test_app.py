@@ -571,6 +571,46 @@ def test_owner_can_remove_document_share(tmp_path):
     assert viewer_download.status_code == 403
 
 
+def test_unshared_user_can_still_see_unshare_event_in_audit_log(tmp_path):
+    app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    viewer_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(viewer_client, username="viewer_user", email="viewer@example.com")
+    login(owner_client, identifier="owner_user")
+    upload_document(owner_client, filename="remove-audit.txt", contents=b"remove audit body")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+    owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "viewer_user",
+            "share_role": "viewer",
+        },
+        follow_redirects=False,
+    )
+
+    viewer_id = json.loads((tmp_path / "data" / "users.json").read_text(encoding="utf-8"))[1]["id"]
+    owner_client.post(
+        "/sharing/remove",
+        data={
+            "document_id": doc_id,
+            "target_user_id": viewer_id,
+        },
+        follow_redirects=False,
+    )
+
+    login(viewer_client, identifier="viewer_user")
+    audit_page = viewer_client.get("/audit")
+
+    assert audit_page.status_code == 200
+    assert b"FILE_UNSHARED" in audit_page.data
+    assert b"remove-audit.txt" in audit_page.data
+
+
 def test_share_role_change_appears_in_owner_audit_log(tmp_path):
     app = build_test_app(tmp_path)
     owner_client = app.test_client()

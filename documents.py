@@ -86,7 +86,7 @@ def get_upload_policy():
 def load_documents():
     data_file = get_documents_file()
     try:
-        with open(data_file, 'r', encoding='utf-8') as f:
+        with open(data_file, 'r', encoding='utf-8-sig') as f:
             documents = json.load(f)
             # I normalize old list-based data to an empty dict because the rest of this file stores docs by id.
             if isinstance(documents, list):
@@ -104,7 +104,7 @@ def save_documents(documents):
 def load_share_index():
     shares_file = get_shares_file()
     try:
-        with open(shares_file, 'r', encoding='utf-8') as f:
+        with open(shares_file, 'r', encoding='utf-8-sig') as f:
             shares = json.load(f)
             return shares if isinstance(shares, list) else []
     except (FileNotFoundError, json.JSONDecodeError):
@@ -227,6 +227,7 @@ def share_document(doc_id, owner_id, target_user_id, role, target_label=None):
                 doc_id,
                 doc.get("display_name", doc["filename"]),
                 details=f"Changed {target_label} from {previous_role} to {role}",
+                affected_user_id=target_user_id,
             )
             return doc
     doc['shared_with'].append({
@@ -243,14 +244,17 @@ def share_document(doc_id, owner_id, target_user_id, role, target_label=None):
         doc_id,
         doc.get("display_name", doc["filename"]),
         details=f"Granted {role} access to {target_label}",
+        affected_user_id=target_user_id,
     )
     return doc
 
 
-def remove_share(doc_id, owner_id, target_user_id):
+def remove_share(doc_id, owner_id, target_user_id, target_label=None):
     documents = load_documents()
     if doc_id not in documents:
         raise ValueError("Document not found.")
+
+    target_label = target_label or target_user_id
 
     doc = documents[doc_id]
     if not can_share_document(doc, owner_id):
@@ -272,7 +276,8 @@ def remove_share(doc_id, owner_id, target_user_id):
         owner_id,
         doc_id,
         doc.get("display_name", doc["filename"]),
-        details=f"Removed access for {target_user_id}",
+        details=f"Removed access for {target_label}",
+        affected_user_id=target_user_id,
     )
     return doc
 

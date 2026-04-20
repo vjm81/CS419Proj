@@ -141,7 +141,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         return [
             entry
             for entry in audit_entries
-            if entry.get("user_id") == user_id or entry.get("doc_id") in visible_doc_ids
+            if entry.get("user_id") == user_id
+            or entry.get("affected_user_id") == user_id
+            or entry.get("doc_id") in visible_doc_ids
         ]
 
     def enrich_audit_entries(entries):
@@ -150,6 +152,14 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             {
                 **entry,
                 "username": users_by_id.get(entry.get("user_id"), entry.get("user_id") or "unknown"),
+                "affected_username": (
+                    users_by_id.get(
+                        entry.get("affected_user_id"),
+                        entry.get("affected_user_id") or "unknown",
+                    )
+                    if entry.get("affected_user_id")
+                    else None
+                ),
                 "formatted_timestamp": datetime.fromtimestamp(
                     entry.get("timestamp", 0)
                 ).strftime("%Y-%m-%d %H:%M:%S"),
@@ -215,7 +225,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         token = current_session_token()
         # I re-check the session on every request because the cookie alone should not be trusted
         # unless it still matches a valid session in our storage.
-        session_data = auth_manager.validate_session(token, client_ip(), client_agent())
+        is_static_request = request.endpoint == "static" or request.path == "/favicon.ico"
+        validator = auth_manager.get_session if is_static_request else auth_manager.validate_session
+        session_data = validator(token, client_ip(), client_agent())
         g.session = session_data
         g.current_user = auth_manager.get_user_by_id(session_data["user_id"]) if session_data else None
 
@@ -498,8 +510,14 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     def remove_document_share():
         doc_id = request.form.get("document_id", "")
         target_user_id = request.form.get("target_user_id", "")
+        target_user = auth_manager.get_user_by_id(target_user_id)
         try:
-            remove_share(doc_id, g.current_user["id"], target_user_id)
+            remove_share(
+                doc_id,
+                g.current_user["id"],
+                target_user_id,
+                target_label=target_user["username"] if target_user else target_user_id,
+            )
         except ValueError as exc:
             flash(str(exc), "error")
             return redirect(url_for("sharing"))

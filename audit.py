@@ -8,7 +8,7 @@ def get_audit_file():
 
 def load_audit():
     try:
-        with open(get_audit_file(), 'r') as f:
+        with open(get_audit_file(), 'r', encoding='utf-8-sig') as f:
             return json.load(f)
     except:
         return []
@@ -17,7 +17,7 @@ def save_audit(data):
     with open(get_audit_file(), 'w') as f:
         json.dump(data, f, indent=4)
 
-def log_event(event, user_id, doc_id=None, filename=None, details=None):
+def log_event(event, user_id, doc_id=None, filename=None, details=None, affected_user_id=None):
     logs = load_audit()
     ip_address = request.remote_addr if has_request_context() else "unknown"
     logs.append({
@@ -26,6 +26,7 @@ def log_event(event, user_id, doc_id=None, filename=None, details=None):
         "doc_id": doc_id,
         "filename": filename,
         "details": details,
+        "affected_user_id": affected_user_id,
         "timestamp": time.time(),
         "ip_address": ip_address
     })
