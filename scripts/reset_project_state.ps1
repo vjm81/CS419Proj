@@ -45,7 +45,7 @@ foreach ($directory in @($dataDir, $logDir, $encryptedDir, $uploadsDir)) {
 foreach ($name in $jsonDefaults.Keys) {
     $target = Join-Path $dataDir $name
     Assert-InProjectRoot -ProjectRoot $projectRoot -TargetPath $target
-    Set-Content -Path $target -Value $jsonDefaults[$name] -Encoding UTF8
+    [System.IO.File]::WriteAllText($target, $jsonDefaults[$name], [System.Text.UTF8Encoding]::new($false))
 }
 
 foreach ($directory in @($encryptedDir, $uploadsDir)) {
@@ -58,7 +58,7 @@ foreach ($directory in @($encryptedDir, $uploadsDir)) {
 foreach ($logName in @("security.log", "access.log")) {
     $logPath = Join-Path $logDir $logName
     Assert-InProjectRoot -ProjectRoot $projectRoot -TargetPath $logPath
-    Set-Content -Path $logPath -Value "" -Encoding UTF8
+    [System.IO.File]::WriteAllText($logPath, "", [System.Text.UTF8Encoding]::new($false))
 }
 
 Write-Output "Project runtime state has been reset."
