@@ -198,9 +198,11 @@ def sync_share_index(documents):
     save_share_index(shares)
 
 
-def share_document(doc_id, owner_id, target_user_id, role):
+def share_document(doc_id, owner_id, target_user_id, role, target_label=None):
     if role not in {"viewer", "editor"}:
         raise ValueError("Invalid share role.")
+
+    target_label = target_label or target_user_id
 
     documents = load_documents()
     if doc_id not in documents:
@@ -214,11 +216,18 @@ def share_document(doc_id, owner_id, target_user_id, role):
 
     for entry in doc['shared_with']:
         if entry['user_id'] == target_user_id:
+            previous_role = entry["role"]
             entry['role'] = role
             doc['updated_at'] = time.time()
             sync_share_index(documents)
             save_documents(documents)
-            log_event("FILE_SHARED", target_user_id, doc_id, doc["filename"])
+            log_event(
+                "FILE_SHARE_ROLE_UPDATED",
+                owner_id,
+                doc_id,
+                doc.get("display_name", doc["filename"]),
+                details=f"Changed {target_label} from {previous_role} to {role}",
+            )
             return doc
     doc['shared_with'].append({
         "user_id": target_user_id,
@@ -228,7 +237,13 @@ def share_document(doc_id, owner_id, target_user_id, role):
     doc['updated_at'] = time.time()
     sync_share_index(documents)
     save_documents(documents)
-    log_event("FILE_SHARED", target_user_id, doc_id, doc["filename"])
+    log_event(
+        "FILE_SHARED",
+        owner_id,
+        doc_id,
+        doc.get("display_name", doc["filename"]),
+        details=f"Granted {role} access to {target_label}",
+    )
     return doc
 
 
@@ -252,7 +267,13 @@ def remove_share(doc_id, owner_id, target_user_id):
     doc["updated_at"] = time.time()
     save_documents(documents)
     sync_share_index(documents)
-    log_event("FILE_UNSHARED", target_user_id, doc_id, doc["filename"])
+    log_event(
+        "FILE_UNSHARED",
+        owner_id,
+        doc_id,
+        doc.get("display_name", doc["filename"]),
+        details=f"Removed access for {target_user_id}",
+    )
     return doc
 
 
@@ -416,6 +437,6 @@ def update_document(doc_id, user_id, file):
 
     save_documents(documents)
     sync_share_index(documents)
-    log_event("FILE_UPDATED", user_id, doc_id, original_filename)
+    log_event("FILE_UPDATED", user_id, doc_id, doc["display_name"])
     return doc
 

@@ -131,6 +131,19 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             editable_shared = [doc for doc in shared if can_edit_document(doc, user_id)]
         return owned, shared, editable_shared
 
+    def get_visible_audit_entries_for_user(user_id: str):
+        audit_entries = enrich_audit_entries(get_recent_audit())
+        if g.current_user["role"] == "admin":
+            return audit_entries
+
+        owned_docs, shared_docs, _ = summarize_documents_for_user(user_id)
+        visible_doc_ids = {doc["id"] for doc in owned_docs + shared_docs}
+        return [
+            entry
+            for entry in audit_entries
+            if entry.get("user_id") == user_id or entry.get("doc_id") in visible_doc_ids
+        ]
+
     def enrich_audit_entries(entries):
         users_by_id = {user["id"]: user["username"] for user in get_all_users()}
         return [
@@ -329,13 +342,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     def dashboard():
         user_id = g.current_user["id"]
         owned_docs, shared_docs, editable_shared_docs = summarize_documents_for_user(user_id)
-        recent_events = enrich_audit_entries(
-            [
-                entry
-                for entry in get_recent_audit()
-                if g.current_user["role"] == "admin" or entry.get("user_id") == user_id
-            ][:5]
-        )
+        recent_events = get_visible_audit_entries_for_user(user_id)[:5]
         return render_template(
             "dashboard.html",
             documents=owned_docs,
@@ -446,7 +453,13 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 return redirect(url_for("sharing"))
 
             try:
-                share_document(doc_id, g.current_user["id"], target_user["id"], role)
+                share_document(
+                    doc_id,
+                    g.current_user["id"],
+                    target_user["id"],
+                    role,
+                    target_label=target_user["username"],
+                )
             except ValueError as exc:
                 flash(str(exc), "error")
                 return redirect(url_for("sharing"))
@@ -501,18 +514,17 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     @login_required
     @role_required("admin", "user", "guest")
     def audit():
-        audit_entries = enrich_audit_entries(get_recent_audit())
         user_id = g.current_user["id"]
-        if g.current_user["role"] != "admin":
-            audit_entries = [
-                entry for entry in audit_entries
-                if entry.get("user_id") == user_id
-            ]
+        audit_entries = get_visible_audit_entries_for_user(user_id)
 
         audit_summary = {
             "total_events": len(audit_entries),
             "downloads": sum(1 for entry in audit_entries if entry["event"] == "FILE_DOWNLOAD"),
-            "shares": sum(1 for entry in audit_entries if entry["event"] in {"FILE_SHARED", "FILE_UNSHARED"}),
+            "shares": sum(
+                1
+                for entry in audit_entries
+                if entry["event"] in {"FILE_SHARED", "FILE_UNSHARED", "FILE_SHARE_ROLE_UPDATED"}
+            ),
             "updates": sum(1 for entry in audit_entries if entry["event"] == "FILE_UPDATED"),
         }
         return render_template("audit.html", audit_entries=audit_entries, audit_summary=audit_summary)

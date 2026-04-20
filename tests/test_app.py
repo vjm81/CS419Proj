@@ -571,6 +571,92 @@ def test_owner_can_remove_document_share(tmp_path):
     assert viewer_download.status_code == 403
 
 
+def test_share_role_change_appears_in_owner_audit_log(tmp_path):
+    app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    viewer_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(viewer_client, username="viewer_user", email="viewer@example.com")
+    login(owner_client, identifier="owner_user")
+    upload_document(owner_client, filename="audit-share.txt", contents=b"audit share body")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+
+    owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "viewer_user",
+            "share_role": "editor",
+        },
+        follow_redirects=False,
+    )
+
+    owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "viewer_user",
+            "share_role": "viewer",
+        },
+        follow_redirects=False,
+    )
+
+    audit_page = owner_client.get("/audit")
+
+    assert audit_page.status_code == 200
+    assert b"FILE_SHARE_ROLE_UPDATED" in audit_page.data
+    assert b"Changed" in audit_page.data
+    assert b"audit-share.txt" in audit_page.data
+
+
+def test_shared_user_sees_document_activity_from_other_users(tmp_path):
+    app = build_test_app(tmp_path)
+    owner_client = app.test_client()
+    viewer_client = app.test_client()
+
+    register(owner_client, username="owner_user", email="owner@example.com")
+    register(viewer_client, username="viewer_user", email="viewer@example.com")
+    login(owner_client, identifier="owner_user")
+    upload_document(owner_client, filename="shared-audit.txt", contents=b"version one")
+
+    documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
+    doc_id = next(iter(documents))
+
+    owner_client.post(
+        "/sharing",
+        data={
+            "share_document": doc_id,
+            "share_user": "viewer_user",
+            "share_role": "viewer",
+        },
+        follow_redirects=False,
+    )
+    owner_client.get(f"/download/{doc_id}")
+    owner_client.post(
+        f"/documents/{doc_id}/update",
+        data={
+            "document_file": (BytesIO(b"version two"), "shared-audit-v2.txt"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    login(viewer_client, identifier="viewer_user")
+    audit_page = viewer_client.get("/audit")
+    dashboard_page = viewer_client.get("/dashboard")
+
+    assert audit_page.status_code == 200
+    assert dashboard_page.status_code == 200
+    assert b"FILE_SHARED" in audit_page.data
+    assert b"FILE_DOWNLOAD" in audit_page.data
+    assert b"FILE_UPDATED" in audit_page.data
+    assert b"shared-audit.txt" in audit_page.data
+    assert b"FILE_UPDATED" in dashboard_page.data
+
+
 def test_owner_can_upload_new_document_version(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
@@ -787,7 +873,7 @@ def test_admin_can_change_user_role_and_remove_user(tmp_path):
     )
 
 
-def test_non_admin_activity_views_only_show_own_events_with_timestamp(tmp_path):
+def test_non_admin_activity_views_accessible_document_events_with_timestamp(tmp_path):
     app = build_test_app(tmp_path)
     owner_client = app.test_client()
     viewer_client = app.test_client()
@@ -826,8 +912,8 @@ def test_non_admin_activity_views_only_show_own_events_with_timestamp(tmp_path):
 
     assert audit_page.status_code == 200
     assert dashboard_page.status_code == 200
-    assert b"owner_user" not in audit_page.data
-    assert b"FILE_UPLOAD" not in audit_page.data
+    assert b"owner_user" in audit_page.data
+    assert b"FILE_UPLOAD" in audit_page.data
     assert b"viewer_user" in audit_page.data
     assert b"FILE_DOWNLOAD" in audit_page.data
     assert expected_timestamp in audit_page.data

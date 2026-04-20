@@ -34,6 +34,7 @@
           <th>Event</th>
           <th>User</th>
           <th>Document</th>
+          <th>Details</th>
           <th>IP Address</th>
         </tr>
       </thead>
@@ -44,6 +45,7 @@
           <td>{{ entry.event }}</td>
           <td>{{ entry.username }}</td>
           <td>{{ entry.filename or entry.doc_id or "N/A" }}</td>
+          <td>{{ entry.details or "N/A" }}</td>
           <td>{{ entry.ip_address }}</td>
         </tr>
         {% endfor %}
