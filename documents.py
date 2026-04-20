@@ -15,7 +15,25 @@ DEFAULT_SHARES_FILE = BASE_DIR / "data" / "shares.json"
 DEFAULT_FILES_DIR = BASE_DIR / "data" / "encrypted"
 DEFAULT_KEY_FILE = BASE_DIR / "secret.key"
 
+#This documents module manages the core functionality related to document storage, retrieval, sharing, 
+#and versioning. It defines functions for loading and saving document metadata, handling file uploads 
+#with encryption, and enforcing access controls based on user roles. The module interacts with the 
+#file system to store encrypted files and uses JSON files to maintain the document index and sharing
+#information. It also includes logging for important events like uploads, shares, updates, and deletions 
+#to support auditing and monitoring of document-related activities. Overall, this module encapsulates 
+#the main logic for managing documents in the application while ensuring security and proper access 
+#controls are in place.
 
+#The get_documents_file, get_shares_file, and get_files_dir functions determine the file paths for 
+#storing document metadata, sharing information, and uploaded files. They attempt to read these paths
+#from the Flask app configuration, allowing for flexibility in different environments, but fall back 
+#to default locations if the app context is not available (such as during testing). The get_encrypted_
+#storage function initializes an instance of the EncryptedFileStorage class using the configured
+#encryption key file, while the get_upload_policy function retrieves the allowed file extensions 
+#and MIME types for uploads from the app configuration, providing defaults if not set. These functions 
+#centralize the configuration and setup for document storage and upload handling, making it easier 
+#to manage and maintain the underlying file paths and policies used throughout the document 
+#management logic.
 def get_documents_file():
     try:
         # I use the app config path here so tests and the real app both read the same documents file.
@@ -23,14 +41,14 @@ def get_documents_file():
     except RuntimeError:
         return DEFAULT_DATA_FILE
 
-
+#see above comment
 def get_shares_file():
     try:
         return Path(current_app.config["DATA_DIR"]) / "shares.json"
     except RuntimeError:
         return DEFAULT_SHARES_FILE
 
-
+#see above comment
 def get_files_dir():
     try:
         # This keeps encrypted uploads inside the app's configured encrypted folder.
@@ -40,7 +58,7 @@ def get_files_dir():
     files_dir.mkdir(parents=True, exist_ok=True)
     return files_dir
 
-
+#see above comment
 def get_encrypted_storage():
     try:
         key_file = Path(current_app.config["ENCRYPTION_KEY_FILE"])
@@ -48,7 +66,7 @@ def get_encrypted_storage():
         key_file = DEFAULT_KEY_FILE
     return EncryptedFileStorage(key_file)
 
-
+#see above comment
 def get_upload_policy():
     try:
         return {
@@ -83,6 +101,14 @@ def get_upload_policy():
             },
         }
 
+#The load_documents function reads the document metadata from a JSON file and returns it as a dictionary. 
+#If the file does not exist or contains invalid JSON, it returns an empty dictionary. 
+#The save_documents function takes a dictionary of documents and writes it to the JSON file, 
+#ensuring that the data is persisted. These functions abstract away the file handling for 
+#document metadata, allowing the rest of the application to interact with documents as Python 
+#dictionaries without worrying about the underlying file storage mechanics. They also handle 
+#potential issues with missing or corrupted files gracefully, ensuring that the application can 
+#continue to function even if there are problems with the document metadata file.
 def load_documents():
     data_file = get_documents_file()
     try:
@@ -94,13 +120,21 @@ def load_documents():
             return documents
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
-    
+
+#see above
 def save_documents(documents):
     data_file = get_documents_file()
     with open(data_file, 'w', encoding='utf-8') as f:
         json.dump(documents, f, indent=4)
 
-
+#The load_share_index and save_share_index functions manage the sharing information for documents.
+#The load_share_index function reads the sharing data from a JSON file and returns it as a list of
+#shares, while the save_share_index function takes a list of shares and writes it to the JSON file.
+#This sharing information is used to quickly determine which documents are shared with which users
+#without having to scan through all document metadata, improving the efficiency of access control 
+#checks and sharing management. Like the document loading and saving functions, these also handle 
+#potential issues with missing or corrupted files gracefully, ensuring that the application can 
+#continue to function even if there are problems with the sharing metadata file.
 def load_share_index():
     shares_file = get_shares_file()
     try:
@@ -110,12 +144,18 @@ def load_share_index():
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
-
+#see above
 def save_share_index(shares):
     shares_file = get_shares_file()
     with open(shares_file, 'w', encoding='utf-8') as f:
         json.dump(shares, f, indent=4)
 
+#The create_document function handles the creation of a new document when a user uploads a file. 
+#It generates a unique document ID, saves the uploaded file using encrypted storage, and creates a 
+#metadata entry for the document that includes information about the owner, sharing settings, 
+#versioning, and timestamps. It also logs the upload event for auditing purposes. 
+#This function encapsulates the entire process of taking an uploaded file, securely storing it, 
+#and creating the necessary metadata to manage it within the application.
 def create_document(file, owner_id, document_name=None):
     documents = load_documents()
     doc_id = str(uuid.uuid4())
@@ -140,18 +180,32 @@ def create_document(file, owner_id, document_name=None):
     save_documents(documents)
     return doc_id
 
+#The get_document function retrieves the metadata for a specific document by its ID. 
+#It loads all documents and returns the one that matches the given ID, or None if it does 
+#not exist. This function is used throughout the application to access document information 
+#when performing operations like viewing, editing, sharing, or deleting documents.
 def get_document(doc_id):
     documents = load_documents()
     return documents.get(doc_id)
 
-
+#The get_all_documents function returns a list of all document metadata entries. It has an optional
+#include_deleted parameter that, when set to True, includes documents that have been marked as deleted.
+#By default, it only returns documents that are not marked as deleted. This function is useful for
+#administrative views or operations that need to access the full list of documents regardless of their
+#deletion status, while the default behavior supports typical user-facing views that should only show
+#active documents.
 def get_all_documents(include_deleted: bool = False):
     documents = list(load_documents().values())
     if include_deleted:
         return documents
     return [doc for doc in documents if not doc.get("is_deleted")]
 
-
+#The get_user_document_role function checks the role of a user with respect to a specific document.
+#It first checks if the user is the owner of the document, and if not, it looks through the shared_with
+#list to see if the user has been granted access and what their role is (viewer or editor).
+#If the user has no access, it returns None. This function is central to enforcing access
+#controls throughout the application, as it allows other functions to determine what actions a user is
+#allowed to perform on a document based on their role.
 def get_user_document_role(doc, user_id):
     if doc["owner_id"] == user_id:
         return "owner"

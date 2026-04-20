@@ -3,10 +3,22 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+#This config module defines the configuration settings for the Flask application, including 
+#security settings, file upload restrictions, directory paths, and session management. 
+#It uses environment variables to allow for easy configuration in different environments
+#(development vs production) while providing sensible defaults. The Config class serves as the 
+#base configuration, with DevelopmentConfig and ProductionConfig subclasses that override specific
+#settings for their respective environments. This modular approach allows for clean separation of 
+#configuration concerns and makes it easy to manage settings across different deployment scenarios.
 
 BASE_DIR = Path(__file__).resolve().parent
 
-
+#The Config class defines the configuration settings for the Flask application, including security 
+#settings, file upload restrictions, directory paths, and session management. It uses environment 
+#variables to allow for easy configuration in different environments (development vs production)
+#while providing sensible defaults. The DevelopmentConfig and ProductionConfig subclasses override 
+#specific settings for their respective environments, allowing for clean separation of configuration
+#concerns and easy management of settings across different deployment scenarios.
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-secret-change-me")
     APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
@@ -57,12 +69,14 @@ class Config:
     SESSION_COOKIE_SECURE = False
     PERMANENT_SESSION_LIFETIME = SESSION_TIMEOUT
 
-
+#The DevelopmentConfig class inherits from the base Config class and overrides specific settings 
+#for the development environment.
 class DevelopmentConfig(Config):
     DEBUG = True
     FORCE_HTTPS = False
 
-
+#The ProductionConfig class inherits from the base Config class and overrides specific settings for the
+#production environment, enabling secure cookies and forcing HTTPS.
 class ProductionConfig(Config):
     DEBUG = False
     SESSION_COOKIE_SECURE = True
