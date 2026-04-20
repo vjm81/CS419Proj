@@ -10,7 +10,12 @@ secret.key
 *.pem
 *.log
 logs/
+data/audit_trail.json
+data/documents.json
 data/login_attempts.json
+data/sessions.json
+data/shares.json
+data/users.json
 data/encrypted/
 files/
 .vscode/
