@@ -215,3 +215,43 @@
     - Mitigation:
         * Use append-only or signed logs
 
+# Section #4 - Data Protection
+
+1. Data Classification
+    - Data              Classification
+    -------------------------------------
+    Password hashes     Sensitive
+    Documents           Confidential
+    Session tokens      Sensitive
+    Audit logs          Internal
+
+2. Encryption Methods
+    - Files encrypted before storage
+    - Encryption handled by internal storage module
+    - Protects against:
+        * Disk compromise
+        * Unauthorized file access
+
+3. Key Management
+    - Encryption key stored in:
+        * secret.key file
+    - Loaded at runtime
+
+    Limitations:
+    - No rotation
+    - Local storage risk
+
+    Mitigation:
+    - External key management system
+
+4. Secure Deletion Procedures
+    - Documents marked as deleted (soft delete)
+    - Files remain for:
+        * Audit purposes
+        * Recovery
+
+    Limitations
+    - Data not physically erased
+
+    Mitigation:
+    - Implement secure overwrite or shredding
