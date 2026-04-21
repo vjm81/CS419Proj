@@ -44,6 +44,7 @@
         <td>
           {% if user.id != g.current_user.id %}
           <form method="post" action="{{ url_for('update_system_role', user_id=user.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <select name="role">
               <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
               <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
@@ -52,6 +53,7 @@
             <button type="submit">Change Role</button>
           </form>
           <form method="post" action="{{ url_for('delete_user_account', user_id=user.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit">Remove User</button>
           </form>
           {% else %}
@@ -89,6 +91,7 @@
           {% if not doc.is_deleted %}
           <a href="{{ url_for('download', doc_id=doc.id) }}">Download</a>
           <form method="post" action="{{ url_for('delete_existing_document', doc_id=doc.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit">Delete Document</button>
           </form>
           {% else %}

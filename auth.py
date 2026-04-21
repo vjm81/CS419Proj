@@ -258,7 +258,7 @@ class AuthManager:
     #The create_session method generates a new session token for a user upon successful login, 
     #stores the session information in the sessions file, and logs the session creation event. 
     #The session information includes the user ID, creation time, last activity time, IP address,
-    #and user agent.
+    #user agent, and a CSRF token that will be checked on state-changing form submissions.
     def create_session(self, user_id: str, ip_address: str, user_agent: str) -> str:
         # To make sessions harder to guess, I use a long random token instead of something predictable.
         token = secrets.token_urlsafe(32)
@@ -270,6 +270,7 @@ class AuthManager:
             "last_activity": time.time(),
             "ip_address": ip_address,
             "user_agent": user_agent,
+            "csrf_token": secrets.token_urlsafe(32),
         }
         self.save_sessions(sessions)
         self.log_event(
@@ -289,11 +290,15 @@ class AuthManager:
         return self._validate_session(token, ip_address, user_agent, touch_activity=True)
 
     #The get_session method is similar to validate_session but does not update the last activity timestamp.
+    #This is useful for requests like static files where I still want to know who the user is, but I do
+    #not want every CSS or JavaScript request to rewrite the sessions file.
     def get_session(self, token: str | None, ip_address: str, user_agent: str) -> dict[str, Any] | None:
         return self._validate_session(token, ip_address, user_agent, touch_activity=False)
 
     #The _validate_session method is an internal helper that performs the actual validation 
-    #logic for session tokens.
+    #logic for session tokens. It checks that the token exists, still matches the original client
+    #details we stored, and has not expired. It can optionally refresh the last activity time when
+    #the request should keep the session alive.
     def _validate_session(
         self,
         token: str | None,
@@ -311,6 +316,26 @@ class AuthManager:
                 "INVALID_SESSION_TOKEN",
                 None,
                 {"reason": "unknown_token", "token_prefix": token[:10]},
+                ip_address,
+                user_agent,
+                severity="WARNING",
+            )
+            return None
+
+        # I compare the current client details with the stored session details here so a stolen
+        # token is harder to reuse from a different browser signature or source.
+        if session.get("ip_address") != ip_address or session.get("user_agent") != user_agent:
+            sessions.pop(token, None)
+            self.save_sessions(sessions)
+            self.log_event(
+                "SESSION_BINDING_MISMATCH",
+                session["user_id"],
+                {
+                    "expected_ip": session.get("ip_address"),
+                    "actual_ip": ip_address,
+                    "expected_user_agent": session.get("user_agent"),
+                    "actual_user_agent": user_agent,
+                },
                 ip_address,
                 user_agent,
                 severity="WARNING",

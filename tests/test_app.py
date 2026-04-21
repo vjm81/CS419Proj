@@ -74,20 +74,40 @@ def login(client, identifier="test_user", password="StrongPass123!"):
         follow_redirects=False,
     )
 
-#This helper function simulates a user logout by sending a POST request to the /logout endpoint.
-#It returns the response object from the logout request, which can be used to verify the outcome
-#of the logout process in the tests.
+#Cookie helper
+def get_session_token(client):
+    cookie = client.get_cookie("session_token")
+    return cookie.value if cookie else None
+
+#csrf token helper
+def get_csrf_token(client, tmp_path):
+    sessions = json.loads((tmp_path / "data" / "sessions.json").read_text(encoding="utf-8"))
+    return sessions[get_session_token(client)]["csrf_token"]
+
+#POST helper
+def authenticated_post(client, tmp_path, path, data=None, **kwargs):
+    payload = {} if data is None else dict(data)
+    payload["csrf_token"] = get_csrf_token(client, tmp_path)
+    return client.post(path, data=payload, **kwargs)
+
+#Document upload helper
 def upload_document(
     client,
+    tmp_path,
     filename="notes.txt",
     contents=b"hello world",
     content_type="text/plain",
+    extra_data=None,
 ):
+    payload = {
+        "document_file": (BytesIO(contents), filename, content_type),
+    }
+    if extra_data:
+        payload.update(extra_data)
+    payload["csrf_token"] = get_csrf_token(client, tmp_path)
     return client.post(
         "/documents",
-        data={
-            "document_file": (BytesIO(contents), filename, content_type),
-        },
+        data=payload,
         content_type="multipart/form-data",
         follow_redirects=False,
     )
@@ -294,7 +314,7 @@ def test_logout_removes_session(tmp_path):
     register(client)
     login(client)
 
-    logout_response = client.post("/logout", follow_redirects=False)
+    logout_response = authenticated_post(client, tmp_path, "/logout", follow_redirects=False)
 
     assert logout_response.status_code == 302
     assert logout_response.headers["Location"].endswith("/login")
@@ -316,6 +336,42 @@ def test_invalid_session_token_is_logged(tmp_path):
     security_log = read_security_log(tmp_path, app)
     assert "INVALID_SESSION_TOKEN" in security_log
 
+
+def test_session_binding_rejects_request_from_different_user_agent(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    register(client)
+    login(client)
+
+    response = client.get(
+        "/dashboard",
+        environ_overrides={"HTTP_USER_AGENT": "different-browser"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/login")
+
+    sessions = json.loads((tmp_path / "data" / "sessions.json").read_text(encoding="utf-8"))
+    assert sessions == {}
+    assert "SESSION_BINDING_MISMATCH" in read_security_log(tmp_path, app)
+
+
+def test_authenticated_post_requires_csrf_token(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    register(client)
+    login(client)
+
+    blocked_response = client.post("/logout", follow_redirects=False)
+    assert blocked_response.status_code == 403
+    assert "CSRF_VALIDATION_FAILED" in read_security_log(tmp_path, app)
+
+    allowed_response = authenticated_post(client, tmp_path, "/logout", follow_redirects=False)
+    assert allowed_response.status_code == 302
+
 #This test verifies that a user with the "guest" role can access shared documents but cannot upload 
 #new documents or edit existing ones.
 #It simulates a scenario where an owner user shares a document with a guest user, and then checks 
@@ -334,10 +390,12 @@ def test_guest_cannot_access_user_only_pages(tmp_path):
     users_path.write_text(json.dumps(users, indent=2), encoding="utf-8")
 
     login(owner_client, identifier="owner_user")
-    upload_document(owner_client, filename="guest-view.txt", contents=b"guest copy")
+    upload_document(owner_client, tmp_path, filename="guest-view.txt", contents=b"guest copy")
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -351,8 +409,10 @@ def test_guest_cannot_access_user_only_pages(tmp_path):
     documents_response = guest_client.get("/documents")
     dashboard_response = guest_client.get("/dashboard")
     download_response = guest_client.get(f"/download/{doc_id}")
-    upload_attempt = upload_document(guest_client, filename="blocked.txt", contents=b"blocked")
-    update_attempt = guest_client.post(
+    upload_attempt = upload_document(guest_client, tmp_path, filename="blocked.txt", contents=b"blocked")
+    update_attempt = authenticated_post(
+        guest_client,
+        tmp_path,
         f"/documents/{doc_id}/update",
         data={"document_file": (BytesIO(b"new"), "new.txt")},
         content_type="multipart/form-data",
@@ -378,7 +438,7 @@ def test_guest_can_still_view_and_download_old_owned_documents(tmp_path):
 
     register(client, username="guest_owner", email="guest-owner@example.com")
     login(client, identifier="guest_owner")
-    upload_document(client, filename="owned-before-downgrade.txt", contents=b"owner bytes")
+    upload_document(client, tmp_path, filename="owned-before-downgrade.txt", contents=b"owner bytes")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
@@ -410,7 +470,7 @@ def test_document_upload_and_listing(tmp_path):
     register(client)
     login(client)
 
-    response = upload_document(client)
+    response = upload_document(client, tmp_path)
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/documents")
@@ -439,6 +499,7 @@ def test_upload_rejects_disallowed_extension(tmp_path):
 
     response = upload_document(
         client,
+        tmp_path,
         filename="payload.exe",
         contents=b"bad file",
         content_type="application/octet-stream",
@@ -463,6 +524,7 @@ def test_upload_rejects_mime_mismatch(tmp_path):
 
     response = upload_document(
         client,
+        tmp_path,
         filename="notes.txt",
         contents=b"pretend executable",
         content_type="application/pdf",
@@ -484,7 +546,9 @@ def test_document_uses_entered_name_in_lists(tmp_path):
     register(client)
     login(client)
 
-    response = client.post(
+    response = authenticated_post(
+        client,
+        tmp_path,
         "/documents",
         data={
             "document_name": "Project Proposal",
@@ -516,7 +580,7 @@ def test_document_download_returns_decrypted_file(tmp_path):
     register(client)
     login(client)
 
-    upload_document(client, filename="secret.txt", contents=b"secret document body")
+    upload_document(client, tmp_path, filename="secret.txt", contents=b"secret document body")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
@@ -542,11 +606,13 @@ def test_owner_can_share_document_with_viewer(tmp_path):
     register(viewer_client, username="viewer_user", email="viewer@example.com")
     login(owner_client, identifier="owner_user")
 
-    upload_document(owner_client, filename="shared.txt", contents=b"shared data")
+    upload_document(owner_client, tmp_path, filename="shared.txt", contents=b"shared data")
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
 
-    share_response = owner_client.post(
+    share_response = authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -583,12 +649,14 @@ def test_non_owner_cannot_share_document(tmp_path):
     register(owner_client, username="owner_user", email="owner@example.com")
     register(editor_client, username="editor_user", email="editor@example.com")
     login(owner_client, identifier="owner_user")
-    upload_document(owner_client, filename="project.txt", contents=b"project body")
+    upload_document(owner_client, tmp_path, filename="project.txt", contents=b"project body")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
 
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -599,7 +667,9 @@ def test_non_owner_cannot_share_document(tmp_path):
     )
 
     login(editor_client, identifier="editor_user")
-    share_attempt = editor_client.post(
+    share_attempt = authenticated_post(
+        editor_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -626,11 +696,13 @@ def test_owner_can_remove_document_share(tmp_path):
     register(owner_client, username="owner_user", email="owner@example.com")
     register(viewer_client, username="viewer_user", email="viewer@example.com")
     login(owner_client, identifier="owner_user")
-    upload_document(owner_client, filename="shared.txt", contents=b"shared data")
+    upload_document(owner_client, tmp_path, filename="shared.txt", contents=b"shared data")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -641,7 +713,9 @@ def test_owner_can_remove_document_share(tmp_path):
     )
 
     viewer_id = json.loads((tmp_path / "data" / "users.json").read_text(encoding="utf-8"))[1]["id"]
-    remove_response = owner_client.post(
+    remove_response = authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing/remove",
         data={
             "document_id": doc_id,
@@ -672,11 +746,13 @@ def test_unshared_user_can_still_see_unshare_event_in_audit_log(tmp_path):
     register(owner_client, username="owner_user", email="owner@example.com")
     register(viewer_client, username="viewer_user", email="viewer@example.com")
     login(owner_client, identifier="owner_user")
-    upload_document(owner_client, filename="remove-audit.txt", contents=b"remove audit body")
+    upload_document(owner_client, tmp_path, filename="remove-audit.txt", contents=b"remove audit body")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -687,7 +763,9 @@ def test_unshared_user_can_still_see_unshare_event_in_audit_log(tmp_path):
     )
 
     viewer_id = json.loads((tmp_path / "data" / "users.json").read_text(encoding="utf-8"))[1]["id"]
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing/remove",
         data={
             "document_id": doc_id,
@@ -716,12 +794,14 @@ def test_share_role_change_appears_in_owner_audit_log(tmp_path):
     register(owner_client, username="owner_user", email="owner@example.com")
     register(viewer_client, username="viewer_user", email="viewer@example.com")
     login(owner_client, identifier="owner_user")
-    upload_document(owner_client, filename="audit-share.txt", contents=b"audit share body")
+    upload_document(owner_client, tmp_path, filename="audit-share.txt", contents=b"audit share body")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
 
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -731,7 +811,9 @@ def test_share_role_change_appears_in_owner_audit_log(tmp_path):
         follow_redirects=False,
     )
 
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -761,12 +843,14 @@ def test_shared_user_sees_document_activity_from_other_users(tmp_path):
     register(owner_client, username="owner_user", email="owner@example.com")
     register(viewer_client, username="viewer_user", email="viewer@example.com")
     login(owner_client, identifier="owner_user")
-    upload_document(owner_client, filename="shared-audit.txt", contents=b"version one")
+    upload_document(owner_client, tmp_path, filename="shared-audit.txt", contents=b"version one")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
 
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -776,7 +860,9 @@ def test_shared_user_sees_document_activity_from_other_users(tmp_path):
         follow_redirects=False,
     )
     owner_client.get(f"/download/{doc_id}")
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         f"/documents/{doc_id}/update",
         data={
             "document_file": (BytesIO(b"version two"), "shared-audit-v2.txt"),
@@ -809,12 +895,14 @@ def test_owner_can_upload_new_document_version(tmp_path):
 
     register(client)
     login(client)
-    upload_document(client, filename="report.txt", contents=b"version one")
+    upload_document(client, tmp_path, filename="report.txt", contents=b"version one")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
 
-    response = client.post(
+    response = authenticated_post(
+        client,
+        tmp_path,
         f"/documents/{doc_id}/update",
         data={
             "document_file": (BytesIO(b"version two"), "report-v2.txt"),
@@ -850,12 +938,14 @@ def test_editor_can_upload_new_document_version_for_shared_file(tmp_path):
     register(owner_client, username="owner_user", email="owner@example.com")
     register(editor_client, username="editor_user", email="editor@example.com")
     login(owner_client, identifier="owner_user")
-    upload_document(owner_client, filename="shared-edit.txt", contents=b"original")
+    upload_document(owner_client, tmp_path, filename="shared-edit.txt", contents=b"original")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
 
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -866,7 +956,9 @@ def test_editor_can_upload_new_document_version_for_shared_file(tmp_path):
     )
 
     login(editor_client, identifier="editor_user")
-    update_response = editor_client.post(
+    update_response = authenticated_post(
+        editor_client,
+        tmp_path,
         f"/documents/{doc_id}/update",
         data={
             "document_file": (BytesIO(b"editor update"), "shared-edit-v2.txt"),
@@ -897,7 +989,7 @@ def test_audit_page_shows_logged_events(tmp_path):
 
     register(client)
     login(client)
-    upload_document(client, filename="audit.txt", contents=b"audit body")
+    upload_document(client, tmp_path, filename="audit.txt", contents=b"audit body")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
@@ -925,7 +1017,7 @@ def test_admin_panel_shows_all_content(tmp_path):
     users_path.write_text(json.dumps(users, indent=2), encoding="utf-8")
 
     login(admin_client, identifier="admin_user")
-    upload_document(admin_client, filename="admin-report.txt", contents=b"admin body")
+    upload_document(admin_client, tmp_path, filename="admin-report.txt", contents=b"admin body")
 
     admin_page = admin_client.get("/admin")
 
@@ -954,13 +1046,18 @@ def test_admin_can_download_and_delete_any_document(tmp_path):
     users_path.write_text(json.dumps(users, indent=2), encoding="utf-8")
 
     login(owner_client, identifier="owner_user")
-    upload_document(owner_client, filename="admin-target.txt", contents=b"admin target body")
+    upload_document(owner_client, tmp_path, filename="admin-target.txt", contents=b"admin target body")
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
 
     login(admin_client, identifier="admin_user")
     download_response = admin_client.get(f"/download/{doc_id}")
-    delete_response = admin_client.post(f"/documents/{doc_id}/delete", follow_redirects=False)
+    delete_response = authenticated_post(
+        admin_client,
+        tmp_path,
+        f"/documents/{doc_id}/delete",
+        follow_redirects=False,
+    )
 
     assert download_response.status_code == 200
     assert download_response.data == b"admin target body"
@@ -994,11 +1091,13 @@ def test_admin_can_change_user_role_and_remove_user(tmp_path):
     updated_users = json.loads(users_path.read_text(encoding="utf-8"))
     target_user = next(user for user in updated_users if user["username"] == "target_user")
 
-    upload_document(admin_client, filename="admin-share.txt", contents=b"admin shared body")
+    upload_document(admin_client, tmp_path, filename="admin-share.txt", contents=b"admin shared body")
     documents_path = tmp_path / "data" / "documents.json"
     documents = json.loads(documents_path.read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
-    admin_client.post(
+    authenticated_post(
+        admin_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
@@ -1012,7 +1111,9 @@ def test_admin_can_change_user_role_and_remove_user(tmp_path):
     sessions_before_delete = json.loads((tmp_path / "data" / "sessions.json").read_text(encoding="utf-8"))
     assert any(session["user_id"] == target_user["id"] for session in sessions_before_delete.values())
 
-    role_response = admin_client.post(
+    role_response = authenticated_post(
+        admin_client,
+        tmp_path,
         f"/admin/users/{target_user['id']}/role",
         data={"role": "guest"},
         follow_redirects=False,
@@ -1023,7 +1124,9 @@ def test_admin_can_change_user_role_and_remove_user(tmp_path):
     target_user = next(user for user in updated_users if user["username"] == "target_user")
     assert target_user["role"] == "guest"
 
-    delete_response = admin_client.post(
+    delete_response = authenticated_post(
+        admin_client,
+        tmp_path,
         f"/admin/users/{target_user['id']}/delete",
         follow_redirects=False,
     )
@@ -1053,11 +1156,13 @@ def test_non_admin_activity_views_accessible_document_events_with_timestamp(tmp_
     register(owner_client, username="owner_user", email="owner@example.com")
     register(viewer_client, username="viewer_user", email="viewer@example.com")
     login(owner_client, identifier="owner_user")
-    upload_document(owner_client, filename="privacy.txt", contents=b"private data")
+    upload_document(owner_client, tmp_path, filename="privacy.txt", contents=b"private data")
 
     documents = json.loads((tmp_path / "data" / "documents.json").read_text(encoding="utf-8"))
     doc_id = next(iter(documents))
-    owner_client.post(
+    authenticated_post(
+        owner_client,
+        tmp_path,
         "/sharing",
         data={
             "share_document": doc_id,
