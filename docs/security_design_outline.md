@@ -109,8 +109,6 @@
         * JSON file storage (race conditions)
         * Lack of database-level constraints
         * Reliance on MIME type validation
-        * No built-in CSRF protection
-        * Session token reuse risk
 
 4. Attack Scenarios
     - Scenario 1: Brute Force Attack
