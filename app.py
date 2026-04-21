@@ -242,7 +242,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         return request.cookies.get("session_token")
 
 
-    #Checks csrf token to block attacks.
+    #This is a helper function to retrieve the CSRF token tied to the current session.
+    #I use this in templates so every logged-in form can include the same token the server
+    #expects when it validates state-changing POST requests.
     def current_csrf_token() -> str:
         if g.get("session"):
             return g.session.get("csrf_token", "")
@@ -314,6 +316,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     @app.before_request
     def protect_authenticated_post_requests():
+        # I validate the CSRF token here before logged-in POST requests are allowed to continue.
+        # This helps stop another site from using the browser's cookie automatically to trigger
+        # actions like share, delete, update, or logout behind the user's back.
         if request.method != "POST":
             return None
         if request.endpoint in {"static", "login", "register"}:
@@ -338,6 +343,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     @app.context_processor
     def inject_template_helpers():
+        # This makes the CSRF token available in every template so forms can include it
+        # without each route having to pass it in manually.
         return {
             "csrf_token": current_csrf_token(),
         }
