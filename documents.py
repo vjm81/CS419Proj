@@ -216,23 +216,36 @@ def get_user_document_role(doc, user_id):
 
     return None
 
-
+#The can_view_document, can_edit_document, and can_share_document functions are helper functions that
+#determine whether a user has the necessary role to perform certain actions on a document.
 def can_view_document(doc, user_id):
     return get_user_document_role(doc, user_id) in {"owner", "editor", "viewer"}
 
-
+#The can_edit_document function checks if the user has either "owner" or "editor" role for the document,
+#which would allow them to make changes to the document. This is used to enforce edit permissions in the
+#application, ensuring that only authorized users can modify the document's content or metadata.
 def can_edit_document(doc, user_id):
     return get_user_document_role(doc, user_id) in {"owner", "editor"}
 
-
+#The can_share_document function checks if the user has the "owner" role for the document, which is
+#required to manage sharing settings. Only the owner of a document should have the ability to share it
+#with others or change sharing permissions, so this function is used to enforce that restriction in the
+#application.
 def can_share_document(doc, user_id):
     return get_user_document_role(doc, user_id) == "owner"
 
-
+#The can_user_access function is a simple wrapper around can_view_document that checks if a user has any
+#level of access to a document (owner, editor, or viewer). This can be used in contexts where we just need
+#to know if the user can access the document at all, without needing to differentiate between view and edit
+#permissions.
 def can_user_access(doc, user_id):
     return can_view_document(doc, user_id)
 
-
+#The sync_share_index function rebuilds the share index based on the current document metadata. It iterates
+#through all documents and their sharing settings to create a list of share entries that include the document
+#ID, owner ID, shared user ID, role, filename, and last updated timestamp. This share index is then saved to
+#a separate JSON file for quick access when determining which documents are shared with which users, improving
+#the efficiency of access control checks and sharing management throughout the application.
 def sync_share_index(documents):
     shares = []
     for doc in documents.values():
@@ -251,7 +264,12 @@ def sync_share_index(documents):
             )
     save_share_index(shares)
 
-
+#The share_document function manages the sharing of a document with another user. It checks if the document 
+#exists and if the owner has permission to share it. It then either updates the sharing role for an 
+#existing shared user or adds a new entry to the shared_with list. After making changes, it updates 
+#the document's metadata, syncs the share index, saves the documents, and logs the sharing event for
+#auditing purposes. This function encapsulates all the logic related to sharing a document, including 
+#permission checks, metadata updates, and event logging.
 def share_document(doc_id, owner_id, target_user_id, role, target_label=None):
     if role not in {"viewer", "editor"}:
         raise ValueError("Invalid share role.")
@@ -302,7 +320,14 @@ def share_document(doc_id, owner_id, target_user_id, role, target_label=None):
     )
     return doc
 
-
+#The remove_share function handles the removal of a user's access to a document. It checks if the 
+#document exists and if the owner has permission to manage sharing for it. It then removes the 
+#specified user from the shared_with list and updates the document's metadata. After making changes, 
+#it syncs the share index, saves the documents, and logs the unsharing event for auditing purposes. 
+#This function ensures that only authorized users can manage sharing settings and that all changes 
+#are properly recorded and reflected in the application's data storage. It also provides feedback 
+#if the user being removed did not have access in the first place, helping to prevent 
+#confusion when managing shares.
 def remove_share(doc_id, owner_id, target_user_id, target_label=None):
     documents = load_documents()
     if doc_id not in documents:
@@ -335,7 +360,12 @@ def remove_share(doc_id, owner_id, target_user_id, target_label=None):
     )
     return doc
 
-
+#The delete_document function marks a document as deleted by setting the is_deleted flag in its metadata.
+#It checks if the document exists and if the user has permission to delete it (either the owner or an override).
+#After marking the document as deleted, it updates the metadata, syncs the share index, saves the documents,
+#and logs the deletion event for auditing purposes. This function does not permanently remove the document or its
+#file from storage, allowing for potential recovery or auditing of deleted documents, while ensuring that
+#deleted documents are not visible or accessible to regular users in the application.
 def delete_document(doc_id, actor_id, allow_override: bool = False):
     documents = load_documents()
     doc = documents.get(doc_id)
@@ -352,7 +382,12 @@ def delete_document(doc_id, actor_id, allow_override: bool = False):
     log_event("FILE_DELETED", actor_id, doc_id, doc.get("display_name", doc["filename"]))
     return doc
 
-
+#The remove_user_from_all_shares function is a utility function that removes a specified user from the 
+#shared_with list of all documents. This is useful in scenarios such as user account deletion, 
+#where you want to ensure that the user no longer has access to any documents they were previously 
+#shared on. The function iterates through all documents, checks if the user is in the shared_with list,
+#and if so, removes them and updates the document's metadata. After processing all documents, it saves 
+#the changes and syncs the share index to reflect the updated sharing information across the application.
 def remove_user_from_all_shares(target_user_id):
     documents = load_documents()
     changed = False
@@ -370,6 +405,12 @@ def remove_user_from_all_shares(target_user_id):
         save_documents(documents)
         sync_share_index(documents)
 
+#The get_user_documents function retrieves a list of documents that a specific user has access to. 
+#It loads all documents and filters them based on whether they are deleted and whether the user has 
+#permission to view them. This function is used to populate the user's document list in the application, 
+#showing them all the documents they own or that have been shared with them, while excluding any documents
+#that have been marked as deleted. It ensures that users only see documents they are authorized to access,
+#maintaining proper access controls in the user interface.
 def get_user_documents(user_id):
     documents = load_documents()
     user_docs = []
@@ -382,11 +423,19 @@ def get_user_documents(user_id):
 
     return user_docs
 
-
+#The get_owned_documents function retrieves a list of documents that are owned by a specific user. 
+#It loads all documents and filters them based on the owner_id. It only returns documents that are not 
+#marked as deleted and where the owner_id matches the given user_id.
 def get_owned_documents(user_id):
     return [doc for doc in load_documents().values() if not doc["is_deleted"] and doc["owner_id"] == user_id]
 
-
+#The get_documents_shared_with_user function retrieves a list of documents that have been shared with a 
+#specific user. It loads all documents and checks if the user has a viewer or editor role for each 
+#document, while also excluding any documents that are marked as deleted. This function is used to 
+#show users the documents that they have access to through sharing, separate from the documents they own, 
+#providing a clear view of their shared document collaborations within the application. 
+#It ensures that users can easily identify which documents they can access through sharing, 
+#while maintaining proper access controls and excluding any documents that are no longer active.
 def get_documents_shared_with_user(user_id):
     shared_docs = []
     for doc in load_documents().values():
@@ -397,15 +446,31 @@ def get_documents_shared_with_user(user_id):
             shared_docs.append(doc)
     return shared_docs
 
+#The get_file_path function constructs the file path for a given document based on its stored filename.
+#It uses the get_files_dir function to determine the base directory for file storage and appends
+#the stored filename from the document metadata. This function is used to locate the encrypted file on disk
+#when performing operations like decryption for downloads or updates, ensuring that the application can
+#consistently find the correct file associated with a document's metadata.
 def get_file_path(doc):
     return str(get_files_dir() / doc['stored_filename'])
 
-
+#The get_decrypted_file_bytes function retrieves the encrypted file associated with a document, 
+#decrypts it, and returns the original file bytes. It uses the get_file_path function to locate the 
+#encrypted file on disk and the get_encrypted_storage function to access the encryption utilities for
+#decryption.
 def get_decrypted_file_bytes(doc):
     encrypted_storage = get_encrypted_storage()
     return encrypted_storage.decrypt_from_file(get_file_path(doc))
 
-
+#The save_encrypted_upload function handles the process of saving an uploaded file in an encrypted format.
+#It first validates the uploaded file against the defined upload policy, then generates a unique stored
+#filename by prefixing the original filename with a UUID. It uses the EncryptedFileStorage instance to
+#encrypt the file bytes and save them to disk. The function returns both the original filename and
+#the stored filename for use in document metadata. This function ensures that all uploaded files are
+#securely stored in an encrypted format, meeting the data-at-rest requirement, while also maintaining
+#the necessary information to manage the files within the application. It also includes validation to
+#enforce file type restrictions and prevent potentially harmful uploads, contributing to the overall
+#security of the application.
 def save_encrypted_upload(file):
     files_dir = get_files_dir()
     encrypted_storage = get_encrypted_storage()
@@ -425,7 +490,11 @@ def save_encrypted_upload(file):
     encrypted_storage.encrypt_to_file(filepath, file.read())
     return original_filename, stored_filename
 
-
+#The validate_uploaded_file function checks if the uploaded file meets the defined upload policy, 
+#including allowed file extensions and MIME types. It extracts the file extension and content type 
+#from the uploaded file and compares them against the allowed lists from the upload policy. 
+#If the file does not meet the requirements, it logs the validation failure and raises a 
+#ValueError to prevent the upload from proceeding.
 def validate_uploaded_file(file, original_filename):
     policy = get_upload_policy()
     extension = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else ""
@@ -444,7 +513,12 @@ def validate_uploaded_file(file, original_filename):
         log_input_validation_failure(original_filename, "mime_extension_mismatch", content_type)
         raise ValueError("The file extension does not match the detected upload type.")
 
-
+#The log_input_validation_failure function logs details about failed input validation attempts for
+#file uploads. It records the filename, reason for failure, and content type in the application logs 
+#with a warning level, and also logs an event for auditing purposes. This function helps to provide 
+#visibility into potentially malicious upload attempts or user errors, allowing administrators to 
+#monitor and respond to issues related to file uploads while maintaining a record of validation 
+#failures for security auditing.
 def log_input_validation_failure(filename, reason, content_type):
     log_event("INPUT_VALIDATION_FAILED", None, filename=filename)
     try:
@@ -467,7 +541,13 @@ def log_input_validation_failure(filename, reason, content_type):
     except RuntimeError:
         pass
 
-
+#The update_document function handles the process of updating an existing document with a new uploaded 
+#file. It checks if the document exists and if the user has permission to edit it. It then saves the 
+#new uploaded file in encrypted storage, updates the document's metadata with the new filename and versioning
+#information, and logs the update event for auditing purposes. This function allows users to replace the
+#content of an existing document while maintaining a history of previous versions and ensuring that all
+#changes are properly recorded and reflected in the application's data storage. It also enforces access
+#controls to ensure that only authorized users can perform updates on the document.
 def update_document(doc_id, user_id, file):
     documents = load_documents()
     doc = documents.get(doc_id)
