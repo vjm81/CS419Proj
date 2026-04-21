@@ -241,6 +241,13 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     def current_session_token() -> str | None:
         return request.cookies.get("session_token")
 
+
+    #Checks csrf token to block attacks.
+    def current_csrf_token() -> str:
+        if g.get("session"):
+            return g.session.get("csrf_token", "")
+        return ""
+
     #This is a decorator function to enforce that a user must be logged in to access certain routes.
     def login_required(view):
         @wraps(view)
@@ -304,6 +311,36 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         ):
             secure_url = request.url.replace("http://", "https://", 1)
             return redirect(secure_url, code=301)
+
+    @app.before_request
+    def protect_authenticated_post_requests():
+        if request.method != "POST":
+            return None
+        if request.endpoint in {"static", "login", "register"}:
+            return None
+        if g.get("current_user") is None:
+            return None
+
+        submitted_token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token", "")
+        expected_token = current_csrf_token()
+        if not expected_token or submitted_token != expected_token:
+            auth_manager.log_event(
+                "CSRF_VALIDATION_FAILED",
+                g.current_user["id"],
+                {"path": request.path},
+                client_ip(),
+                client_agent(),
+                severity="WARNING",
+            )
+            return render_template("403.html"), 403
+
+        return None
+
+    @app.context_processor
+    def inject_template_helpers():
+        return {
+            "csrf_token": current_csrf_token(),
+        }
 
     #This function is registered to run after each request, and it sets various HTTP security 
     #headers on the response to help protect against common web vulnerabilities such as XSS, 

@@ -13,6 +13,7 @@
   <article>
     <h3>Upload Document</h3>
     <form method="post" action="{{ url_for('documents') }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label for="document_name">Document Name</label>
       <input id="document_name" name="document_name" type="text">
 
@@ -56,11 +57,13 @@
               <details>
                 <summary>Upload New Version</summary>
                 <form method="post" action="{{ url_for('update_existing_document', doc_id=doc.id) }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <label for="owned-update-{{ doc.id }}">Choose replacement file</label>
                 <input id="owned-update-{{ doc.id }}" name="document_file" type="file" required>
                 <button type="submit">Replace File</button>
               </form>
               <form method="post" action="{{ url_for('delete_existing_document', doc_id=doc.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit">Delete Document</button>
               </form>
               {% if doc.version_history %}
@@ -110,6 +113,7 @@
             <details>
               <summary>Upload New Version</summary>
               <form method="post" action="{{ url_for('update_existing_document', doc_id=doc.id) }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <label for="shared-update-{{ doc.id }}">Choose replacement file</label>
                 <input id="shared-update-{{ doc.id }}" name="document_file" type="file" required>
                 <button type="submit">Replace File</button>

@@ -12,6 +12,7 @@
   <article>
     <h3>Share a Document</h3>
     <form method="post" action="{{ url_for('sharing') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label for="share_document">Document</label>
       <select id="share_document" name="share_document">
         {% if owned_documents %}
@@ -69,6 +70,7 @@
             <td>{{ share.target_username }}</td>
             <td>
               <form method="post" action="{{ url_for('sharing') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="share_document" value="{{ share.document_id }}">
                 <input type="hidden" name="share_user" value="{{ share.target_username }}">
                 <select name="share_role">
@@ -80,6 +82,7 @@
             </td>
             <td>
               <form method="post" action="{{ url_for('remove_document_share') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="document_id" value="{{ share.document_id }}">
                 <input type="hidden" name="target_user_id" value="{{ share.target_user_id }}">
                 <button type="submit">Remove</button>

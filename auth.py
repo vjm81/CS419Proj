@@ -270,6 +270,7 @@ class AuthManager:
             "last_activity": time.time(),
             "ip_address": ip_address,
             "user_agent": user_agent,
+            "csrf_token": secrets.token_urlsafe(32),
         }
         self.save_sessions(sessions)
         self.log_event(
@@ -311,6 +312,24 @@ class AuthManager:
                 "INVALID_SESSION_TOKEN",
                 None,
                 {"reason": "unknown_token", "token_prefix": token[:10]},
+                ip_address,
+                user_agent,
+                severity="WARNING",
+            )
+            return None
+
+        if session.get("ip_address") != ip_address or session.get("user_agent") != user_agent:
+            sessions.pop(token, None)
+            self.save_sessions(sessions)
+            self.log_event(
+                "SESSION_BINDING_MISMATCH",
+                session["user_id"],
+                {
+                    "expected_ip": session.get("ip_address"),
+                    "actual_ip": ip_address,
+                    "expected_user_agent": session.get("user_agent"),
+                    "actual_user_agent": user_agent,
+                },
                 ip_address,
                 user_agent,
                 severity="WARNING",
