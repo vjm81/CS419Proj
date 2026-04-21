@@ -1,255 +1,554 @@
-# Security Design Document Outline
+# Security Design Document
 
-# Section #1 - Architecture Overview
+## Project Information
 
-1. System Architecture Diagram
-    - Presentation Layer
-        * Flask routes and templates
-        * Handles HTTP requests/responses
-    - Application Layer
-        * auth.py = authentication and session logic
-        * documents.py = document handling and sharing
-        * audit.py = logging and monitoring
-    - Data Layer
-        * JSON-based storage (users, sessions, documents, shares)
-        * Encrypted file storage on disk
+- Project: Secure Document Sharing System
+- Course: CS 419 Secure Web Application Project
+- Team Members:
+  - Yung Hao Sun
+  - Victor Mai
+- Technology Stack:
+  - Python
+  - Flask
+  - JSON file-based storage
+  - `bcrypt`
+  - `cryptography.fernet`
+  - HTML/CSS/JavaScript
 
-2. Data Flow Diagrams
-    - Authentication Flow
-        * User submits credentials
-        * System validates input
-        * Password checked using bcrypt
-        * If valid -> session token generated
-        * Session stored and returned to client
-    - File Upload Flow
-        * File uploaded by user
-        * Filename sanitized
-        * File validated (extension + MIME type)
-        * File encrypted
-        * Encrypted file stored on disk
-        * Metadata saved in JSON
+---
 
-3. Component Descriptions
-    - Authentication Manager (auth.py)
-        * Handles:
-            - Registration
-            - Login/logout
-            - Session validation
-            - Rate limiting
-            - Account lockout
-        * Uses secure hashing and token-based sessions
-    - Document Manager (documents.py)
-        * Handles:
-            - File uploads (encrypted)
-            - Document metadata
-            - Versioning
-            - Sharing permissions
-        * Enforces access control policies
-    - Audit System (audit.py)
-        * Logs:
-            - Security events
-            - File actions
-            - User activity
-        * Provides accountability and traceability
-    - Configuration Module (config.py)
-        * Centralizes
-            - Security settings
-            - File restrictions
-            - Environment variables
-        * Supports secure deployment practices
+## 1. Introduction
 
-4. Technology Stack Justification
-    - Backend Framework: Flask
-        * Lightweight and modular
-        * Easy integration with security libraries
-        * Suitable for educational secure systems
-    - Passwords Security: bcrypt
-        * Industry-standard hashing algorithm
-        * Built-in salting cost factor
-    - File Handling: Werkzeug
-        * Secure filename sanitization
-        * Reliable request handling
-    - Storage Choice (JSON)
-        * Simple and transparent for development
-        * Allows manual inspection for auditing
-        * Tradeoff: not scalable (acknowledged limitation)
+### 1.1 Project Purpose
 
-# Section #2 - Threat Model
+This project is a secure web application for document upload, download, sharing, and auditing. The system allows authenticated users to manage files while enforcing security controls required by the course project specification.
 
-1. Asset Identification
-    - Critical assets include:
-        * User credentials (password hashes)
-        * Session tokens
-        * Encrypted document files
-        * Document metadata
-        * Audit logs
-        * Encryption key file
+### 1.2 Security Goals
 
-2. Threat Enumeration
-    - Using STRIDE-style thinking:
-        * Spoofing
-            - Stolen session tokens
-            - Credential guessing
-        * Tampering
-            - File modification
-            - JSON data corruption
-        * Repudiation
-            - Users denying actions
-        * Information Disclosure
-            - Unauthorized document access
-            - Data leaks
-        * Denial of Service
-            - Login flooding
-            - File upload abuse
-        * Elevation of Privilege
-            - Unauthor-ized role escalation
+The main security goals of the project are:
 
-3. Vunerability Assessment
-    - Potential weaknesses:
-        * JSON file storage (race conditions)
-        * Lack of database-level constraints
-        * Reliance on MIME type validation
+- protect user credentials
+- restrict document access to authorized users only
+- encrypt files stored on disk
+- maintain secure session handling
+- log important security and document events
+- reduce risk from common web attacks such as brute force login attempts, forced browsing, insecure uploads, and session misuse
 
-4. Attack Scenarios
-    - Scenario 1: Brute Force Attack
-        * Attacker attempts repeated logins
-        * Mitigated by:
-            - Rate limiting
-            - Account lockout
-    - Scenario 2: Malicious File Upload
-        * Attacker uploads disguised executable
-        * Mitigated by:
-            - Extension whitelist
-            - MIME validation
-    - Scenario 3: Unauthorized Document Access
-        * User attempts to access another user's file
-        * Mitigated by:
-            - Role-based access control
-    - Scenario 4: Sessions Hijacking
-        * Attacker steals session token
-        * Impact:
-            - Full account access
-5. Risk Prioritization
-    Threat             Likelihood     Impact     Priority
-    ----------------------------------------------------------
-    Brute force login    High         Medium     High
-    File upload attack   Medium       High       High
-    Session hijacking    Medium       High       High
-    Data corruption      Low          Medium     Medium
-    Privilege escalation Low          High       Medium
+### 1.3 Scope
 
-# Section #3 - Security Controls
+This document covers the actual security design implemented in the codebase, including:
 
-1. Password Security
-    - Control Description:
-        * Secure password storage
-    - Implementation
-        * bcrypt hashing with salt
-    - Testing:
-        * Attempt plaintext retrieval -> impossible
-        * Verify login with correct/incorrect passwords
-    - Limitations:
-        * No password rotation policy
-    - Mitigation:
-        * Enforce periodic password changes
+- authentication and access control
+- input validation
+- encryption and key handling
+- session security
+- security headers
+- logging and audit trail design
 
-2. Rate Limiting
-    - Control Description:
-        * Limit login attempts per IP
-    - Implementation
-        * 10 attempts per minute per IP
-    - Testing:
-        * Simulate repeated login attempts
-    - Limitations:
-        * Can be bypassed with multiple IPs
-    - Mitigation:
-        * Add CAPTCHA or device fingerprinting
+It also notes important limitations where the current project uses a lightweight academic implementation instead of a production-grade design.
 
-3. Account Lockout
-    - Control Description:
-        * Lock account after failed attempts
-    - Implementation
-        * Lock after 5 failures for 15 minutes
-    - Testing:
-        * Trigger lock condition
-    - Limitations:
-        * Could enable denial-of-service
-    - Mitigation:
-        * Add progressive delays instead
+---
 
-4. Encryption at Rest
-    - Control Description:
-        * Protect stored files
-    - Implementation
-        * Files encrypted before disk storage
-    - Testing:
-        * Verify stored files are unreadable
-    - Limitations:
-        * Key stored locally
-    - Mitigation:
-        * Use hardware security module (HSM)
+## 2. Architecture Overview
 
-5. Access Control
-    - Control Description:
-        * Restrict document access
-    - Implementation
-        * Owner/editor/viewer roles
-    - Testing:
-        * Attempt unauthorized actions
-    - Limitations:
-        * No hierarchical roles
-    - Mitigation:
-        * Add policy engine
+### 2.1 High-Level System Design
 
-6. Audit Logging
-    - Control Description:
-        * Track system activity
-    - Implementation
-        * JSON-based audit trail
-    - Testing:
-        * Trigger events and verify logs
-    - Limitations:
-        * No tamper protection
-    - Mitigation:
-        * Use append-only or signed logs
+The application uses a simple layered structure:
 
-# Section #4 - Data Protection
+```mermaid
+flowchart TD
+    A["Browser Client"] --> B["Flask App (app.py)"]
+    B --> C["Authentication Layer (auth.py)"]
+    B --> D["Document Layer (documents.py)"]
+    B --> E["Audit Layer (audit.py)"]
+    C --> F["JSON Storage"]
+    D --> F
+    E --> F
+    D --> G["Encrypted File Storage"]
+    G --> H["secret.key"]
+```
 
-1. Data Classification
-    - Data              Classification
-    -------------------------------------
-    Password hashes     Sensitive
-    Documents           Confidential
-    Session tokens      Sensitive
-    Audit logs          Internal
+### 2.2 Main Components
 
-2. Encryption Methods
-    - Files encrypted before storage
-    - Encryption handled by internal storage module
-    - Protects against:
-        * Disk compromise
-        * Unauthorized file access
+#### `app.py`
 
-3. Key Management
-    - Encryption key stored in:
-        * secret.key file
-    - Loaded at runtime
+Responsible for:
 
-    Limitations:
-    - No rotation
-    - Local storage risk
+- Flask app creation
+- route handling
+- role checks
+- CSRF enforcement
+- session loading
+- HTTPS configuration
+- security header configuration
 
-    Mitigation:
-    - External key management system
+#### `auth.py`
 
-4. Secure Deletion Procedures
-    - Documents marked as deleted (soft delete)
-    - Files remain for:
-        * Audit purposes
-        * Recovery
+Responsible for:
 
-    Limitations
-    - Data not physically erased
+- registration validation
+- password hashing with `bcrypt`
+- login verification
+- account lockout
+- login rate limiting
+- session creation and validation
+- session binding checks
+- security event logging
 
-    Mitigation:
-    - Implement secure overwrite or shredding
+#### `documents.py`
+
+Responsible for:
+
+- secure upload handling
+- encrypted file storage
+- document metadata storage
+- version history
+- document sharing
+- file-level authorization checks
+
+#### `audit.py`
+
+Responsible for:
+
+- audit trail storage
+- audit event creation
+- recent event retrieval
+
+### 2.3 Data Storage Model
+
+The project uses JSON files instead of SQL. This matches the style used by the course project examples and keeps the system simple for a course deployment.
+
+Tracked runtime storage:
+
+- `data/users.json`
+- `data/sessions.json`
+- `data/login_attempts.json`
+- `data/documents.json`
+- `data/shares.json`
+- `data/audit_trail.json`
+
+Encrypted files are stored separately in:
+
+- `data/encrypted/`
+
+### 2.4 Why JSON Storage Was Used
+
+JSON file-based persistence was chosen because:
+
+- it matches the lightweight scope of the assignment
+- it is easy to inspect during development and testing
+- it supports demonstrating security logic clearly
+
+Limitations:
+
+- weaker concurrency guarantees than a database
+- higher risk of corruption if not carefully written
+- not appropriate for high-scale production use
+
+This limitation was partially reduced in the project by adding safer write behavior for session and audit storage.
+
+---
+
+## 3. Threat Model
+
+### 3.1 Assets
+
+Important assets in the system include:
+
+- password hashes
+- session tokens
+- encryption key
+- encrypted uploaded files
+- document metadata
+- user role assignments
+- audit logs and security logs
+
+### 3.2 Threat Actors
+
+The system is primarily designed to defend against:
+
+- unauthenticated external attackers
+- authenticated low-privilege users attempting privilege escalation
+- users attempting unauthorized document access
+- attackers trying to abuse sessions or file uploads
+
+### 3.3 Key Threats Considered
+
+| Threat | Example |
+|---|---|
+| Credential attacks | brute-force login attempts |
+| Session abuse | replaying or stealing session tokens |
+| Access control bypass | downloading another user's unshared file |
+| File upload abuse | uploading disallowed or disguised file types |
+| Tampering | modifying runtime JSON state or document metadata |
+| Repudiation | denying a share, update, or delete action |
+| Information disclosure | exposing confidential documents to unauthorized users |
+
+### 3.4 Risk Summary
+
+| Threat | Likelihood | Impact | Notes |
+|---|---|---|---|
+| Brute-force login | High | Medium | mitigated with rate limiting and lockout |
+| Unauthorized document access | Medium | High | mitigated with system and document role checks |
+| Session replay | Medium | High | mitigated with session binding and timeout |
+| Unsafe upload handling | Medium | High | mitigated with extension and MIME restrictions |
+| JSON storage corruption | Low | Medium | partially mitigated with safer write behavior |
+
+---
+
+## 4. Security Controls
+
+### 4.1 Authentication Security
+
+The application protects authentication with:
+
+- password policy enforcement during registration
+- password hashing using `bcrypt`
+- duplicate username/email checks
+- account lockout after 5 failed attempts for 15 minutes
+- IP rate limiting of 10 login attempts per minute
+
+Example implementation pattern from [auth.py](C:/Users/Owner/Documents/codes/CS419Proj/auth.py):
+
+```python
+password_hash = bcrypt.hashpw(
+    password.encode("utf-8"),
+    bcrypt.gensalt(rounds=12),
+).decode("utf-8")
+```
+
+### 4.2 Authorization and Access Control
+
+The application uses two access-control layers.
+
+#### System Roles
+
+- `admin`
+- `user`
+- `guest`
+
+#### Document Roles
+
+- `owner`
+- `editor`
+- `viewer`
+
+System role controls platform-level privileges, while document role controls access to individual files.
+
+Examples:
+
+- admins can view all content and manage users
+- guests can only view/download allowed content
+- owners can share and manage their documents
+- editors can upload new versions
+- viewers can read/download only
+
+### 4.3 Session Security
+
+Session controls implemented in the project:
+
+- random server-generated session tokens
+- session timeout
+- logout removes the current session
+- invalid session token logging
+- session binding to original IP and user agent
+- CSRF token stored per session and required for authenticated POST requests
+
+Session structure includes:
+
+- `token`
+- `user_id`
+- `created_at`
+- `last_activity`
+- `ip_address`
+- `user_agent`
+- `csrf_token`
+
+### 4.4 Input Validation and Upload Security
+
+The upload flow uses:
+
+- `secure_filename(...)`
+- extension allowlist
+- MIME allowlist
+- extension-to-MIME matching
+- controlled encrypted storage directory
+
+This helps reduce:
+
+- path traversal risk
+- unsafe extension uploads
+- mismatched upload type abuse
+
+### 4.5 Encryption and Transport Security
+
+#### Data At Rest
+
+Uploaded files are encrypted before being written to disk using `cryptography.fernet`.
+
+#### Data In Transit
+
+The Flask app supports HTTPS using:
+
+- `cert.pem`
+- `key.pem`
+
+The app can run locally over TLS and includes optional HTTPS enforcement behavior.
+
+### 4.6 Security Headers
+
+The application sets the following response headers:
+
+- `Content-Security-Policy`
+- `X-Frame-Options`
+- `X-Content-Type-Options`
+- `Referrer-Policy`
+- `Permissions-Policy`
+- `Strict-Transport-Security`
+
+These reduce client-side attack surface such as clickjacking and unsafe resource loading.
+
+### 4.7 Logging and Monitoring
+
+The project includes two kinds of logging:
+
+#### Security Log
+
+Stored in:
+
+- `logs/security.log`
+
+Examples of logged events:
+
+- login success/failure
+- account lockouts
+- rate limiting
+- invalid session tokens
+- CSRF validation failures
+- session binding mismatches
+
+#### Audit Trail
+
+Stored in:
+
+- `data/audit_trail.json`
+
+Examples of logged events:
+
+- file upload
+- file download
+- file share / unshare
+- share role update
+- file update
+- file delete
+- admin role changes
+
+---
+
+## 5. Data Flow and Security Workflow
+
+### 5.1 Login Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as Flask App
+    participant AU as Auth Manager
+    participant S as sessions.json
+
+    U->>A: Submit username/email + password
+    A->>AU: login_user(...)
+    AU->>AU: Validate rate limit + lockout
+    AU->>AU: Verify bcrypt password hash
+    AU->>S: Create session token + CSRF token
+    A-->>U: Set secure session cookie
+```
+
+### 5.2 Upload Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as Flask App
+    participant D as Document Layer
+    participant E as Encrypted Storage
+    participant J as documents.json
+
+    U->>A: Upload file
+    A->>D: create_document(...)
+    D->>D: Sanitize filename
+    D->>D: Validate extension + MIME
+    D->>E: Encrypt bytes before storage
+    D->>J: Save metadata
+    D->>A: Log FILE_UPLOAD
+```
+
+### 5.3 Sharing Flow
+
+The sharing flow requires:
+
+- authenticated user
+- valid CSRF token
+- owner authorization
+- valid target username
+- allowed share role (`viewer` or `editor`)
+
+The system then:
+
+- updates the document share metadata
+- updates the share index
+- writes an audit entry
+
+---
+
+## 6. Mapping To Project PDF Requirements
+
+This section ties the implementation directly to the PDF-style requirements.
+
+### 6.1 Authentication and Access Control
+
+Implemented:
+
+- registration
+- login/logout
+- password hashing
+- password complexity checks
+- account lockout
+- rate limiting
+- session creation
+- system roles
+- document roles
+
+### 6.2 Input Validation
+
+Implemented:
+
+- filename sanitization
+- upload extension restrictions
+- MIME restrictions
+- route-level validation of required fields
+
+### 6.3 Encryption
+
+Implemented:
+
+- encrypted file storage
+- local TLS support
+- separate encryption key file
+
+### 6.4 Session Management
+
+Implemented:
+
+- session token creation
+- timeout handling
+- logout
+- session binding checks
+- CSRF tokens for authenticated POST requests
+
+### 6.5 Security Headers
+
+Implemented:
+
+- CSP
+- HSTS
+- anti-clickjacking and content-type protections
+
+### 6.6 Logging and Monitoring
+
+Implemented:
+
+- security log
+- audit trail
+- document activity logging
+- authorization failure logging
+- validation failure logging
+
+---
+
+## 7. Data Protection
+
+### 7.1 Data Classification
+
+| Data Type | Classification |
+|---|---|
+| Password hashes | Sensitive |
+| Session tokens | Sensitive |
+| Encryption key | Highly sensitive |
+| Uploaded files | Confidential |
+| Audit logs | Internal |
+| Usernames/emails | Internal / sensitive |
+
+### 7.2 Encryption Method
+
+Uploaded files are encrypted with Fernet before storage. This provides confidentiality for stored files if the disk contents are accessed without the application.
+
+### 7.3 Key Management
+
+The encryption key is stored in:
+
+- `secret.key`
+
+Strengths:
+
+- stored separately from encrypted files
+- not committed to Git
+- loaded at runtime
+
+Limitations:
+
+- local file-based key storage
+- no key rotation
+- no dedicated secret-management service
+
+### 7.4 Secure Deletion
+
+Current behavior:
+
+- documents are soft-deleted in metadata
+- deleted records remain in audit/history context
+
+Limitation:
+
+- this is not full secure overwrite or cryptographic erasure
+
+For a course project, this supports accountability and recovery, but it is not a production-grade secure deletion design.
+
+---
+
+## 8. Limitations and Future Improvements
+
+The current implementation is appropriate for a course project, but several improvements would be needed in a production system.
+
+### 8.1 Storage Limitations
+
+- replace JSON files with a transactional database such as PostgreSQL
+- improve cross-process locking and consistency guarantees
+
+### 8.2 Upload Hardening
+
+- content-based file inspection
+- stronger malware scanning if required
+
+### 8.3 Key Management
+
+- external key vault / secret manager
+- key rotation support
+
+### 8.4 Session Security
+
+- optional stricter concurrent-session controls
+- richer device/session management UI
+
+### 8.5 Deployment Hardening
+
+- production WSGI server
+- reverse proxy for HTTPS redirect handling
+- trusted CA certificate instead of self-signed development cert
+
+---
+
+## 9. Conclusion
+
+The Secure Document Sharing System implements the major security controls required by the project specification using a practical Flask-based design. The current codebase includes authentication protections, role-based authorization, encrypted storage, session security, CSRF protection, upload validation, HTTPS support, logging, and audit visibility. While the project uses simplified storage and local key handling suitable for an academic environment, the implemented design still demonstrates the core security principles expected for the assignment.
+
