@@ -20,6 +20,5 @@ data/encrypted/
 files/
 .vscode/
 tests/__pycache__/
-docs/*.pdf
-presentation/*.pdf
-presentation/*.pptx
+docs/*outline*.md
+presentation/*.md
